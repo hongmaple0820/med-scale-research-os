@@ -1,12 +1,18 @@
 name: MedSCALE GitHub Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       publish:
         description: 'Publish to npm from GitHub Actions'
+        required: true
+        default: false
+        type: boolean
+      create_release:
+        description: 'Create GitHub Release after publish'
         required: true
         default: false
         type: boolean
@@ -24,6 +30,8 @@ jobs:
     name: Verify and publish MedSCALE
     runs-on: ubuntu-latest
     environment: npm
+    env:
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,12 +41,33 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          registry-url: https://registry.npmjs.org
+          node-version: 22
           cache: npm
+
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          node --version
+          npm --version
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+            if [[ "${TAG}" != "v${VERSION}" ]]; then
+              echo "::error::Git tag ${TAG} does not match package.json version v${VERSION}"
+              exit 1
+            fi
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Verify MedSCALE release gate
         run: npm run release:medscale
@@ -93,14 +122,40 @@ jobs:
           retention-days: 30
 
       - name: Publish to npm
-        if: github.event_name == 'release' || inputs.publish == true
+        if: github.event_name == 'push' || inputs.publish == true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --registry=https://registry.npmjs.org
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
+            echo "Using NPM_TOKEN secret for npm authentication."
+          else
+            echo "NPM_TOKEN is empty; npm will try npm trusted publishing via GitHub OIDC."
+          fi
+          PUBLISH_ARGS=(--access public --registry=https://registry.npmjs.org)
+          if [ "${{ github.event.repository.private }}" = "true" ]; then
+            echo "Repository is private; skipping npm provenance because npm provenance is not supported for private repositories."
+          else
+            PUBLISH_ARGS+=(--provenance)
+          fi
+          npm publish "${PUBLISH_ARGS[@]}"
 
       - name: Verify published npx entrypoint
-        if: github.event_name == 'release' || inputs.publish == true
+        if: github.event_name == 'push' || inputs.publish == true
         run: |
-          VERSION=$(node -p "require('./package.json').version")
+          VERSION="${{ steps.meta.outputs.version }}"
           npx -y @hongmaple0820/med-scale-research-os@${VERSION} setup --json
           npx -y @hongmaple0820/med-scale-research-os@${VERSION} doctor --json
+
+      - name: Create GitHub Release
+        if: (github.event_name == 'push' || inputs.publish == true) && (github.event_name == 'push' || inputs.create_release == true)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          TITLE="MedSCALE Research OS ${TAG}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub Release ${TAG} already exists."
+          else
+            gh release create "$TAG" --verify-tag --title "$TITLE" --generate-notes --latest
+          fi

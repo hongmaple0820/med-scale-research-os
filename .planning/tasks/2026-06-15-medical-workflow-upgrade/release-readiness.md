@@ -8,9 +8,10 @@ MedSCALE Research OS is ready as a local delivery candidate and ready to move to
 
 Actual public npm release should be performed by GitHub Actions, not from this machine.
 
-It is not ready for GitHub-driven public npm release until:
+It is not ready for GitHub-driven public npm release until one npm authentication path is configured:
 
-- GitHub repository secret `NPM_TOKEN` is configured with npm publish permission;
+- GitHub repository secret `NPM_TOKEN` is configured with npm publish permission; or
+- npm Trusted Publishing is configured for this GitHub repository and workflow;
 - `.github/workflows/publish.yml` is present on the default branch;
 - the release owner accepts that full `target-research-platform` pytest still has 3 external/fixture integration failures recorded in verification.
 
@@ -19,7 +20,7 @@ It is not ready for GitHub-driven public npm release until:
 - `npm run release:medscale`: passed.
 - `npm audit --omit=dev --registry=https://registry.npmjs.org`: 0 vulnerabilities.
 - `npm publish --dry-run --json --registry=https://registry.npmjs.org`: passed.
-- `.github/workflows/publish.yml` defines a GitHub Actions release path for release events and manual workflow dispatch.
+- `.github/workflows/publish.yml` defines an automatic GitHub Actions release path for `v*.*.*` tag pushes and a manual workflow dispatch fallback.
 - `npm pack` / publish dry-run includes:
   - `dist/api/medscale.js`
   - `target-research-platform/main.py`
@@ -45,8 +46,8 @@ It is not ready for GitHub-driven public npm release until:
 
 ## Remaining Release Blockers
 
-- `NPM_TOKEN` has not been verified as a GitHub repository secret.
-- A GitHub Release has not been published yet. This is intentional until the repository secret is configured.
+- npm authentication has not been verified. Use either `NPM_TOKEN` or npm Trusted Publishing.
+- The existing `v0.43.0` tag was pushed before automatic tag publishing was added, so it will not retro-trigger the new workflow.
 - Full `target-research-platform` pytest still has 3 external/fixture integration failures recorded in verification.
 
 ## Repository Delivery State
@@ -56,19 +57,25 @@ It is not ready for GitHub-driven public npm release until:
 - First commit scope: MedSCALE Research OS baseline, GitHub release workflow, native `medscale` CLI, memory review flow, Runtime Doctor cards, release smoke checks, docs, and medical workflow assets.
 - Excluded from first commit: runtime outputs, query caches, local databases, logs, Python bytecode, temporary dashboard artifacts, and local `.tmp-*` files.
 
-## GitHub Release Setup
+## Automatic GitHub Release Setup
 
-1. Add repository secret `NPM_TOKEN` in GitHub:
+1. Configure one npm authentication path.
+   Option A: add repository secret `NPM_TOKEN` in GitHub:
    `Settings -> Secrets and variables -> Actions -> New repository secret`.
-2. Push the first commit to the remote default branch `main`.
-3. Create and publish a GitHub Release for tag `v0.43.0`, or run `MedSCALE GitHub Release` manually with `publish = true`.
-4. Let GitHub Actions run:
+
+   Option B: configure npm Trusted Publishing for package `@hongmaple0820/med-scale-research-os`, repository `hongmaple0820/med-scale-research-os`, workflow `.github/workflows/publish.yml`, environment `npm`.
+2. Push release changes to the remote default branch `main`.
+3. Push a version tag that exactly matches `package.json`, for example `v0.43.0`.
+4. Let GitHub Actions run automatically:
    - `npm ci`
    - `npm run release:medscale`
    - `npm audit --omit=dev --registry=https://registry.npmjs.org`
    - `npm publish --dry-run --json --registry=https://registry.npmjs.org`
    - `npm publish --access public --registry=https://registry.npmjs.org`
    - post-publish `npx` setup/doctor smoke
+   - automatic GitHub Release creation
+
+If the GitHub repository is public, the workflow also adds npm provenance. If the repository remains private, the workflow skips provenance because npm does not support provenance generation from private repositories.
 
 After GitHub Actions publish:
 
@@ -77,26 +84,22 @@ npx -y @hongmaple0820/med-scale-research-os setup --visual --lang zh
 npx -y @hongmaple0820/med-scale-research-os doctor --json
 ```
 
-## GitHub Delivery Path After First Commit Is Organized
+## GitHub Delivery Path
 
 ```powershell
 git status --short
 git add <reviewed release files>
-git commit -m "Release MedSCALE Research OS initial version"
-git branch -M main
-git push -u origin main
+git commit -m "Prepare MedSCALE Research OS release"
+git push origin main
 git tag v0.43.0
 git push origin v0.43.0
 ```
 
-Then publish through GitHub, not from the local machine:
+Pushing the tag is the release trigger. GitHub Actions will publish npm and create the GitHub Release after the publish smoke passes.
 
-```powershell
-gh release create v0.43.0 --title "MedSCALE Research OS v0.43.0" --notes "Initial MedSCALE Research OS release candidate."
-```
+For the already-pushed `v0.43.0` tag, use one of these paths after npm authentication is configured:
 
-Or publish the release from the GitHub web UI after verifying `NPM_TOKEN` is configured.
-
-Pushing the tag alone does not publish npm. The npm publish step is intentionally gated behind the GitHub Release `published` event, or a manual workflow dispatch with `publish = true`.
+- run `MedSCALE GitHub Release` manually with `publish = true`; or
+- intentionally recreate the `v0.43.0` tag on the current release commit, then push it again.
 
 Do not add runtime outputs, caches, local databases, logs, screenshots, or temporary dashboard artifacts to the first commit.

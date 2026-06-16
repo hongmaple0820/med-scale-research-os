@@ -878,10 +878,47 @@ has_release_medscale true
 has_create_release false
 ```
 
+Historical notes:
+
+- This was the first GitHub-driven release workflow shape.
+- It was later replaced by the automatic tag-driven workflow validated below.
+
+### Automatic tag-driven GitHub release workflow validation
+
+Command:
+
+```powershell
+node --input-type=module -e "import fs from 'node:fs'; import yaml from 'js-yaml'; const doc = yaml.load(fs.readFileSync('.github/workflows/publish.yml','utf8')); const steps = doc.jobs.release.steps; console.log(doc.name); console.log(Object.keys(doc.on).join(',')); console.log(JSON.stringify(doc.on.push.tags)); console.log(JSON.stringify(doc.on.workflow_dispatch.inputs)); console.log('node', steps.find(s => s.name === 'Setup Node.js').with['node-version']); console.log('has_tag_metadata', steps.some(s => s.id === 'meta')); console.log('has_auto_release', steps.some(s => s.name === 'Create GitHub Release')); console.log('has_release_event', Object.hasOwn(doc.on, 'release')); console.log('has_npm_token_fallback', JSON.stringify(doc).includes('secrets.NPM_TOKEN')); console.log('has_private_provenance_guard', JSON.stringify(doc).includes('skipping npm provenance'));"
+```
+
+Working directory:
+
+```text
+E:\project\yixue-scale-engine
+```
+
+Result:
+
+```text
+MedSCALE GitHub Release
+push,workflow_dispatch
+["v*.*.*"]
+{"publish":{"description":"Publish to npm from GitHub Actions","required":true,"default":false,"type":"boolean"},"create_release":{"description":"Create GitHub Release after publish","required":true,"default":false,"type":"boolean"}}
+node 22
+has_tag_metadata true
+has_auto_release true
+has_release_event false
+has_npm_token_fallback true
+has_private_provenance_guard true
+```
+
 Notes:
 
-- The workflow publishes only from GitHub Actions, gated by either a GitHub Release `published` event or manual `workflow_dispatch` with `publish = true`.
-- The workflow does not create a GitHub Release itself, avoiding a double-trigger loop.
+- Future `v*.*.*` tag pushes now automatically run the release workflow.
+- The workflow validates that the tag exactly matches `package.json` version.
+- The workflow supports both `NPM_TOKEN` and npm Trusted Publishing / GitHub OIDC.
+- The workflow skips npm provenance when the GitHub repository is private, matching npm's provenance limitation for private repositories.
+- After this workflow change, `npm run release:medscale` was rerun and passed: typecheck, 3 focused Vitest files / 26 tests, build, `medscale.release_smoke.v1`, and npm pack dry-run.
 
 ### MedSCALE GitHub release gate
 

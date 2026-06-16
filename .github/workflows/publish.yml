@@ -130,6 +130,10 @@ jobs:
             printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
             echo "Using NPM_TOKEN secret for npm authentication."
           else
+            if [ "${{ github.event.repository.private }}" = "true" ]; then
+              echo "::error::NPM_TOKEN secret is empty. Private GitHub repositories cannot use npm provenance, and this release expects NPM_TOKEN unless npm Trusted Publishing is configured and accepted by npm for this package."
+              exit 1
+            fi
             echo "NPM_TOKEN is empty; npm will try npm trusted publishing via GitHub OIDC."
           fi
           PUBLISH_ARGS=(--access public --registry=https://registry.npmjs.org)

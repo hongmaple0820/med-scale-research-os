@@ -1,0 +1,81 @@
+{
+  "version": "1.1",
+  "stack": "auto",
+  "coverage_threshold": 80,
+  "profiles": {
+    "scaffold": {
+      "description": "Validate the repository workflow scaffold itself.",
+      "checks": [
+        "lint"
+      ]
+    },
+    "default": {
+      "description": "Validate the scale-engine repository.",
+      "services": [
+        "root"
+      ],
+      "checks": [
+        "lint",
+        "typecheck",
+        "test",
+        "build"
+      ]
+    },
+    "all": {
+      "description": "Run the full repository validation surface.",
+      "services": "*",
+      "checks": [
+        "lint",
+        "typecheck",
+        "test",
+        "build",
+        "security"
+      ]
+    }
+  },
+  "services": {
+    "root": {
+      "path": ".",
+      "stack": "node",
+      "required": true,
+      "commands": {
+        "typecheck": "npm run typecheck"
+      }
+    }
+  },
+  "stacks": {
+    "node": {
+      "detect": [
+        "package.json"
+      ],
+      "commands": {
+        "build": "npm run build",
+        "lint": "npm run lint",
+        "typecheck": "npm run typecheck",
+        "test": "npm run test",
+        "coverage": "npm run coverage",
+        "security": "npm audit --audit-level=high"
+      },
+      "required_tools": {
+        "build": [
+          "npm"
+        ],
+        "lint": [
+          "npm"
+        ],
+        "typecheck": [
+          "npm"
+        ],
+        "test": [
+          "npm"
+        ],
+        "coverage": [
+          "npm"
+        ],
+        "security": [
+          "npm"
+        ]
+      }
+    }
+  }
+}

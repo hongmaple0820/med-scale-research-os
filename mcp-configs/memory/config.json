@@ -1,0 +1,9 @@
+{
+  "name": "memory",
+  "description": "Knowledge graph for persistent memory",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-memory"],
+  "env": {},
+  "tools": ["add_entities", "add_relations", "read_graph", "search_nodes"],
+  "whenToUse": "Remembering context across sessions"
+}

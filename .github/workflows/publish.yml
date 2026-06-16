@@ -1,0 +1,106 @@
+name: MedSCALE GitHub Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to npm from GitHub Actions'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: medscale-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Verify and publish MedSCALE
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify MedSCALE release gate
+        run: npm run release:medscale
+
+      - name: Runtime dependency audit
+        run: npm audit --omit=dev --registry=https://registry.npmjs.org
+
+      - name: Publish dry run
+        run: npm publish --dry-run --json --registry=https://registry.npmjs.org > medscale-publish-dry-run.json
+
+      - name: Check publish dry-run package contents
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const dryRun = JSON.parse(readFileSync('medscale-publish-dry-run.json', 'utf8'))
+          const files = new Set((dryRun.files ?? []).map(file => file.path))
+          const required = [
+            'dist/api/medscale.js',
+            'target-research-platform/main.py',
+            'target-research-platform/src/output/usage_envelope.py',
+            'scripts/workflow/medscale-release-smoke.mjs',
+            '.scale/skills.json',
+            '.scale/mcp-servers.yaml',
+          ]
+          const missing = required.filter(path => !files.has(path))
+          if (missing.length > 0) {
+            throw new Error(`Publish dry-run is missing required files: ${missing.join(', ')}`)
+          }
+          const forbidden = [...files].filter(path =>
+            path.startsWith('output/') ||
+            path.startsWith('target-research-platform/output/') ||
+            path.includes('__pycache__/') ||
+            /\.py[cod]$/i.test(path)
+          )
+          if (forbidden.length > 0) {
+            throw new Error(`Publish dry-run includes forbidden runtime/cache files: ${forbidden.join(', ')}`)
+          }
+          console.log(JSON.stringify({
+            name: dryRun.name,
+            version: dryRun.version,
+            entryCount: dryRun.entryCount,
+            size: dryRun.size,
+            unpackedSize: dryRun.unpackedSize,
+          }, null, 2))
+          NODE
+
+      - name: Upload publish dry-run evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: medscale-publish-dry-run
+          path: medscale-publish-dry-run.json
+          retention-days: 30
+
+      - name: Publish to npm
+        if: github.event_name == 'release' || inputs.publish == true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --registry=https://registry.npmjs.org
+
+      - name: Verify published npx entrypoint
+        if: github.event_name == 'release' || inputs.publish == true
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          npx -y @hongmaple0820/med-scale-research-os@${VERSION} setup --json
+          npx -y @hongmaple0820/med-scale-research-os@${VERSION} doctor --json

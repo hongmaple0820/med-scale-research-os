@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "scalePackage": "@hongmaple0820/scale-engine",
+  "scaleVersion": "0.43.0",
+  "pack": "scale-engine-repo",
+  "packVersion": 1,
+  "generatedAt": "2026-05-27T12:00:00.000Z",
+  "files": [
+    {
+      "path": ".scale/workspace.json",
+      "sha256": "df5ceff8d6a62b967123bbb040fbc06559c087d1bc36825dcaa821440be9ba03",
+      "owned": true
+    },
+    {
+      "path": ".agent/project.json",
+      "sha256": "68f1eaa44b95b057a91480f789138346148df8bcd4da02b436f98b81ad0ac555",
+      "owned": true
+    },
+    {
+      "path": ".claude/settings.json",
+      "sha256": "63a13d59f4270b0f69407ffe0539f2d426af820739f4ce85abe290b83509eb58",
+      "owned": true
+    },
+    {
+      "path": ".claude/workflow.json",
+      "sha256": "919a9e47fe5bd502cce9ceff8dd9f7af11ff8cb0892cdd608f8fcf52b759f34e",
+      "owned": true
+    },
+    {
+      "path": ".claude/hooks/session-start-reminder.sh",
+      "sha256": "a60f6dbe625ad76d163925a98c69436b55e9cff87b38c3658e83f27264f31641",
+      "owned": true
+    },
+    {
+      "path": ".claude/hooks/gate-execute-phase.sh",
+      "sha256": "697f99695f4da8394e518057b049bfc337d72fa73a0928bc1938a857dc3e95dd",
+      "owned": true
+    },
+    {
+      "path": ".claude/hooks/session-end-gate.sh",
+      "sha256": "e63792df216def5ab29297cfbf02bee1ed76d587653e34b73dc00f50e97377d5",
+      "owned": true
+    },
+    {
+      "path": "scripts/hooks/check-dangerous-file.sh",
+      "sha256": "24cae60d60ea5bfc23e829f43baf04a8f4a4a2d6c5f3a84f6e2afce5e4a6f7e2",
+      "owned": true
+    },
+    {
+      "path": "scripts/hooks/check-explore.sh",
+      "sha256": "6e6b8396e338ae4decaaa4b6d5bdf2389758e7e56d3a49d343044662b16b6b85",
+      "owned": true
+    },
+    {
+      "path": "scripts/hooks/check-tdd.sh",
+      "sha256": "2faa1db23e877994b52b4c6c82722ba6674bb68ea803effefb7035a2cd254d3e",
+      "owned": true
+    },
+    {
+      "path": "scripts/hooks/check-context.sh",
+      "sha256": "06aed14b51ee96b529353ad9e27930a5da6ccbf2f96945ffcb1ab73bcae611a8",
+      "owned": true
+    },
+    {
+      "path": "scripts/workflow/new-task.sh",
+      "sha256": "2566465afc141163cc80bd95a153d0f973f835bdc221e93be7f76bf8f0d78b96",
+      "owned": true
+    },
+    {
+      "path": "scripts/workflow/explore.sh",
+      "sha256": "65009b2d5dac75b9fd8f2801f8e7bc2d344f5c52de68797ef18174a0546c7a06",
+      "owned": true
+    },
+    {
+      "path": "scripts/workflow/resume.sh",
+      "sha256": "999da2f2e0db8ffedc63559da8d28ab3eadc308abc0e5e94d80ee7656a5cbfe9",
+      "owned": true
+    },
+    {
+      "path": "scripts/workflow/verify.sh",
+      "sha256": "6b92ad0ee1bb61a972c8ffc648aea093712dedbf1d521b4d5aea70f1002dd872",
+      "owned": true
+    },
+    {
+      "path": "scripts/gates/all.sh",
+      "sha256": "dd71b80e6290efb339d902ba8238d1638141200f1fb18cc4918817e466e9ee09",
+      "owned": true
+    },
+    {
+      "path": "scripts/workflow/new-task.ps1",
+      "sha256": "9b1a84c1d07ef92f53adaf858e738ffbe64d2eade9d1d942a42479a9c30829eb",
+      "owned": true
+    },
+    {
+      "path": "scripts/workflow/explore.ps1",
+      "sha256": "d08fc7eca5c9aff605d5766682f1ba837063d55788514cf5307973cb19ef1d20",
+      "owned": true
+    },
+    {
+      "path": "scripts/workflow/resume.ps1",
+      "sha256": "8c7bd3f38f684fbeed79077c8b66dceccf3a52aa6bad81de26d64793f198a8e3",
+      "owned": true
+    },
+    {
+      "path": "scripts/workflow/verify.ps1",
+      "sha256": "a6b3dcfaa0fb86a820632b5be85e31e2f639514b432b80fbfc37ef7d310b71a8",
+      "owned": true
+    },
+    {
+      "path": "scripts/gates/all.ps1",
+      "sha256": "4ddbb56adadbfe1ba60eafd3ba182a95a6a5e5b12072a1b0bc3aa908f775fde6",
+      "owned": true
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "ccb0e35ff524c91f3347492fbb5b0ad921f398ed82e504cf6627b57cd330c71c",
+      "owned": true
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "22767607f2eccf636a761012092b52888e79a8acf447927b31d5bbfd5bf8f772",
+      "owned": true
+    },
+    {
+      "path": "Makefile",
+      "sha256": "70410283cf4b76d32e9dff89f010c6af96acd8e443b3b10b506da864f77e6747",
+      "owned": true
+    },
+    {
+      "path": "docs/guides/GETTING_STARTED.md",
+      "sha256": "d007ae6c95e48970ec7b066a59bc904616e9b2484719e8bc6610d2550d594d5f",
+      "owned": true
+    },
+    {
+      "path": "docs/guides/DEVELOPMENT_WORKFLOW.md",
+      "sha256": "e31b67a85ce25b49d57a1a1ba7f5688e040bde9168df18b5a96a2a75d52f91fa",
+      "owned": true
+    },
+    {
+      "path": "docs/workflow/README.md",
+      "sha256": "bc61c51313a39400105f04bfde9e9d7666648321b43637e482722903e291f2ca",
+      "owned": true
+    }
+  ]
+}

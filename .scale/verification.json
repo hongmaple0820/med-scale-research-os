@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "defaultProfile": "default",
+  "profiles": {
+    "default": {
+      "commands": {
+        "build": "npm run build",
+        "lint": "npm run lint",
+        "test": "npx vitest run --reporter=dot --testTimeout=30000"
+      },
+      "services": [
+        "med-scale-research-os"
+      ]
+    },
+    "productSmoke": {
+      "commands": {
+        "smoke": "powershell -ExecutionPolicy Bypass -File scripts/qa/product-smoke.ps1"
+      },
+      "services": [
+        "med-scale-research-os"
+      ]
+    }
+  },
+  "services": [
+    {
+      "name": "med-scale-research-os",
+      "path": ".",
+      "type": "node",
+      "required": true
+    }
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tmp",
+    "temp",
+    "coverage",
+    "test-results"
+  ],
+  "policy": {
+    "mode": "standard",
+    "optionalToolsWarnOnly": true,
+    "artifactGate": "warn",
+    "artifactGateLevels": [
+      "M",
+      "L",
+      "CRITICAL"
+    ],
+    "engineeringStandardsGate": "block",
+    "productSmokeGate": "warn"
+  }
+}

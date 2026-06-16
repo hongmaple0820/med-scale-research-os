@@ -1,0 +1,56 @@
+name: target-intelligence
+version: "2.0"
+description: >
+  靶点情报分析系统 — 4 阶段标准化流水线。
+  每个数据点有溯源链和置信度标注。
+
+axes:
+  phase:
+    description: 分析阶段
+    values: [expression, screening, research, planning, full]
+    default: full
+  quality_tier:
+    description: 产出质量级别
+    values: [internal, citable, paper]
+    default: citable
+  language:
+    description: 报告语言
+    values: [zh, en, bilingual]
+    default: bilingual
+
+mappings:
+  phase:
+    expression: dynamic/phase1-guide.md
+    screening: dynamic/phase2-guide.md
+    research: dynamic/phase3-guide.md
+    planning: dynamic/phase4-guide.md
+    full:
+      - dynamic/phase1-guide.md
+      - dynamic/phase2-guide.md
+      - dynamic/phase3-guide.md
+      - dynamic/phase4-guide.md
+
+always_load:
+  - static/anti-hallucination.md
+  - static/source-grounding.md
+  - static/schema-definitions.md
+  - static/quality-tiers.md
+  - static/terminology-ledger.md
+  - static/qa-checklist.md
+
+triggers:
+  - 靶点
+  - 靶点分析
+  - 靶点筛选
+  - 表达分析
+  - 预后分析
+  - 生存分析
+  - 药物靶点
+  - target analysis
+  - target screening
+  - druggability
+  - 竞争格局
+  - 专利分析
+  - 临床管线
+  - 免疫浸润
+  - TME

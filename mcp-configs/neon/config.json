@@ -1,0 +1,11 @@
+{
+  "name": "neon",
+  "description": "Neon PostgreSQL database",
+  "command": "npx",
+  "args": ["-y", "@anthropic/mcp-neon"],
+  "env": {
+    "NEON_API_KEY": "${NEON_API_KEY}"
+  },
+  "tools": ["create_branch", "run_query", "describe_table"],
+  "whenToUse": "Branching database workflows"
+}

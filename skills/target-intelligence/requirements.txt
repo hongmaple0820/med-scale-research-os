@@ -1,0 +1,35 @@
+# Target Intelligence - Python Dependencies
+# Verified 2026-06-01
+
+# HTTP & API
+requests>=2.28.0
+
+# Data processing
+pandas>=1.5.0
+numpy>=1.23.0
+scipy>=1.9.0
+
+# Statistics & survival analysis
+lifelines>=0.27.0
+statsmodels>=0.13.0
+
+# Visualization
+matplotlib>=3.6.0
+seaborn>=0.12.0
+
+# Report generation (Phase 4)
+jinja2>=3.1.0
+python-docx>=1.0.0
+
+# PDF export
+weasyprint>=60.0
+
+# PPTX generation (used by nature_pptx.py, report_to_ppt.py, chinese_pptx.py)
+python-pptx>=0.6.21
+
+# Differential expression (optional, for DESeq2 analysis)
+pydeseq2>=0.4.0
+
+# Async task queue (Layer 3)
+celery>=5.3.0
+redis>=5.0.0

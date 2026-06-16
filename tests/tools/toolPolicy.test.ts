@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest'
+import {
+  DEFAULT_TOOL_POLICY,
+  requiredToolsForDomains,
+  resolveToolPolicy,
+  toolPolicyTemplate,
+} from '../../src/tools/ToolPolicy.js'
+
+describe('ToolPolicy', () => {
+  it('defaults to evidence-required mode and maps domains to required tools', () => {
+    const policy = resolveToolPolicy(null)
+
+    expect(policy.mode).toBe('evidence-required')
+    expect(policy.tools['web-access']).toMatchObject({
+      enabled: true,
+      requiredFor: ['webResearch'],
+    })
+    expect(requiredToolsForDomains(policy, ['webResearch', 'ui']).map(tool => tool.id)).toEqual(expect.arrayContaining([
+      'web-access',
+      'awesome-design-md',
+      'ui-ux-pro-max',
+    ]))
+  })
+
+  it('merges project policy overrides without losing default tool contracts', () => {
+    const policy = resolveToolPolicy({
+      version: 1,
+      mode: 'block',
+      tools: {
+        'agent-browser': {
+          enabled: false,
+          requiredFor: ['browserAutomation'],
+          destructiveActions: 'block',
+        },
+      },
+    })
+
+    expect(policy.mode).toBe('block')
+    expect(policy.tools['web-access']).toEqual(DEFAULT_TOOL_POLICY.tools['web-access'])
+    expect(policy.tools['agent-browser']).toMatchObject({
+      enabled: false,
+      requiredFor: ['browserAutomation'],
+      destructiveActions: 'block',
+    })
+  })
+
+  it('renders a stable starter tools.json template', () => {
+    const parsed = JSON.parse(toolPolicyTemplate('advisory')) as { mode: string; tools: Record<string, unknown> }
+
+    expect(parsed.mode).toBe('advisory')
+    expect(parsed.tools).toHaveProperty('web-access')
+    expect(parsed.tools).toHaveProperty('agent-browser')
+    expect(parsed.tools).toHaveProperty('desktop-cua')
+  })
+})

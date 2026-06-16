@@ -1,0 +1,830 @@
+{
+  "version": 1,
+  "policy": {
+    "mode": "warn",
+    "enforceLevels": [
+      "M",
+      "L",
+      "CRITICAL"
+    ],
+    "requireSkillPlan": true
+  },
+  "domains": {
+    "ui": {
+      "detect": {
+        "files": [
+          "src/**/*.tsx",
+          "src/**/*.jsx",
+          "app/**/*.tsx",
+          "pages/**/*.tsx",
+          "components/**/*.tsx",
+          "**/*.css",
+          "**/*.scss"
+        ],
+        "keywords": [
+          "ui",
+          "ux",
+          "frontend",
+          "component",
+          "page",
+          "layout",
+          "responsive",
+          "visual",
+          "界面",
+          "页面",
+          "交互",
+          "视觉",
+          "前端"
+        ]
+      },
+      "requiredSkills": [
+        "awesome-design-md",
+        "ui-ux-pro-max"
+      ],
+      "recommendedSkills": [
+        "frontend-design",
+        "webapp-testing",
+        "agent-browser",
+        "mcp-chrome-devtools",
+        "browser-testing-with-devtools",
+        "design-review"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "mini-prd.md",
+        "ui-spec.md",
+        "visual-review.md"
+      ],
+      "requiredVerification": [
+        "design-system",
+        "screenshot",
+        "responsive-check",
+        "browser-run",
+        "visual-review"
+      ]
+    },
+    "webResearch": {
+      "detect": {
+        "files": [
+          "docs/research/**",
+          "docs/**/research.md",
+          "**/research.md"
+        ],
+        "keywords": [
+          "web research",
+          "search online",
+          "online",
+          "latest",
+          "source citation",
+          "source citations",
+          "logged-in",
+          "login",
+          "dynamic web page",
+          "authenticated page",
+          "inspect page",
+          "web-access",
+          "network",
+          "web fetch"
+        ]
+      },
+      "requiredSkills": [
+        "web-access"
+      ],
+      "recommendedSkills": [
+        "agent-browser",
+        "mcp-chrome-devtools",
+        "source-driven-development",
+        "browser-use"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "verification.md"
+      ],
+      "requiredVerification": [
+        "source-citation",
+        "browser-evidence",
+        "network-console-check"
+      ]
+    },
+    "medicalLiteratureReview": {
+      "detect": {
+        "files": [
+          "target-research-platform/src/api_clients/pubmed_client.py",
+          "target-research-platform/src/api_clients/openalex_client.py",
+          "target-research-platform/src/analysis/**",
+          "target-research-platform/output/manuscripts/**"
+        ],
+        "keywords": [
+          "PubMed",
+          "OpenAlex",
+          "literature review",
+          "systematic review",
+          "文献",
+          "综述",
+          "检索策略"
+        ]
+      },
+      "recommendedSkills": [
+        "research-paper-writer",
+        "aminer-data-search",
+        "best-practices-researcher",
+        "document-review"
+      ],
+      "requiredArtifacts": [
+        "literature-search-strategy.md",
+        "literature-evidence-table.md",
+        "citation-screening-notes.md"
+      ],
+      "requiredVerification": [
+        "source-citation",
+        "pmid-or-doi-check",
+        "evidence-table-review"
+      ]
+    },
+    "medicalFactCheck": {
+      "detect": {
+        "files": [
+          "target-research-platform/output/manuscripts/**/*fact_check*.json",
+          "target-research-platform/src/output/**",
+          "target-research-platform/src/dashboard/**"
+        ],
+        "keywords": [
+          "fact check",
+          "claim",
+          "unverified claim",
+          "事实核查",
+          "声明",
+          "证据"
+        ]
+      },
+      "recommendedSkills": [
+        "adversarial-document-reviewer",
+        "document-review",
+        "correctness-reviewer",
+        "proof"
+      ],
+      "requiredArtifacts": [
+        "claim-evidence-map.md",
+        "fact-check-report.json",
+        "unverified-claims.md"
+      ],
+      "requiredVerification": [
+        "claim-source-link",
+        "contradiction-check",
+        "human-review-todo"
+      ]
+    },
+    "medicalEvidenceGrading": {
+      "detect": {
+        "keywords": [
+          "evidence grade",
+          "GRADE",
+          "guideline",
+          "trial phase",
+          "循证",
+          "证据分级",
+          "指南"
+        ]
+      },
+      "recommendedSkills": [
+        "research-paper-writer",
+        "data-integrity-guardian",
+        "correctness-reviewer",
+        "best-practices-researcher"
+      ],
+      "requiredArtifacts": [
+        "evidence-grade-table.md",
+        "study-design-risk.md",
+        "clinical-guideline-comparison.md"
+      ],
+      "requiredVerification": [
+        "study-design-check",
+        "guideline-source-check",
+        "grade-rationale"
+      ]
+    },
+    "medicalStatisticalReview": {
+      "detect": {
+        "files": [
+          "target-research-platform/src/analysis/**",
+          "target-research-platform/output/**/*.json",
+          "target-research-platform/output/**/*.csv"
+        ],
+        "keywords": [
+          "p-value",
+          "hazard ratio",
+          "confidence interval",
+          "statistical",
+          "统计",
+          "显著性",
+          "置信区间"
+        ]
+      },
+      "recommendedSkills": [
+        "data-integrity-guardian",
+        "correctness-reviewer",
+        "schema-drift-detector",
+        "proof"
+      ],
+      "requiredArtifacts": [
+        "statistical-review.md",
+        "assumption-checklist.md",
+        "data-provenance.md"
+      ],
+      "requiredVerification": [
+        "metric-definition-check",
+        "sample-size-or-cohort-check",
+        "data-provenance-check"
+      ]
+    },
+    "medicalPackageAudit": {
+      "detect": {
+        "files": [
+          "target-research-platform/src/output/delivery_packager.py",
+          "target-research-platform/output/manuscripts/**/*delivery_manifest*.json",
+          "target-research-platform/output/manuscripts/**/*.zip"
+        ],
+        "keywords": [
+          "package audit",
+          "delivery manifest",
+          "submission",
+          "figure reference",
+          "交付包",
+          "清单",
+          "图表引用"
+        ]
+      },
+      "recommendedSkills": [
+        "data-integrity-guardian",
+        "document-review",
+        "testing-reviewer",
+        "maintainability-reviewer"
+      ],
+      "requiredArtifacts": [
+        "package-audit-report.json",
+        "figure-reference-check.md",
+        "delivery-manifest-review.md"
+      ],
+      "requiredVerification": [
+        "manifest-file-exists",
+        "figure-reference-check",
+        "zip-content-audit"
+      ]
+    },
+    "medicalMemoryCurator": {
+      "detect": {
+        "files": [
+          ".scale/memory/**",
+          ".scale/memory-provider-imports/**",
+          "target-research-platform/output/manuscripts/**/*memory*.json",
+          "target-research-platform/output/manuscripts/**/*learning_candidate*.json"
+        ],
+        "keywords": [
+          "memory seed",
+          "learning candidate",
+          "Memory Brain",
+          "gbrain",
+          "记忆",
+          "学习候选",
+          "审核"
+        ]
+      },
+      "recommendedSkills": [
+        "Memory",
+        "learnings-researcher",
+        "obsidian-ontology-sync",
+        "data-integrity-guardian"
+      ],
+      "requiredArtifacts": [
+        "memory-seed-report.json",
+        "learning-candidate-review.md",
+        "memory-provenance.md"
+      ],
+      "requiredVerification": [
+        "memory-provider-status",
+        "approve-reject-stale-restore",
+        "claim-provenance-check"
+      ]
+    },
+    "browserAutomation": {
+      "detect": {
+        "files": [
+          "tests/e2e/**",
+          "e2e/**",
+          "playwright.config.*",
+          "**/*.spec.ts",
+          "**/*.e2e.ts"
+        ],
+        "keywords": [
+          "browser automation",
+          "browser interaction",
+          "browser behavior",
+          "browser",
+          "playwright",
+          "agent-browser",
+          "chrome devtools",
+          "cdp",
+          "screenshot",
+          "console log",
+          "network request",
+          "e2e",
+          "end-to-end"
+        ]
+      },
+      "recommendedSkills": [
+        "webapp-testing",
+        "agent-browser",
+        "web-access",
+        "mcp-chrome-devtools",
+        "playwright",
+        "playwright-interactive"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "e2e-plan.md",
+        "verification.md"
+      ],
+      "requiredVerification": [
+        "browser-run",
+        "screenshot",
+        "console-log",
+        "network-console-check"
+      ]
+    },
+    "e2e": {
+      "detect": {
+        "files": [
+          "tests/e2e/**",
+          "e2e/**",
+          "playwright.config.*"
+        ],
+        "keywords": [
+          "e2e",
+          "browser",
+          "playwright",
+          "end-to-end",
+          "端到端",
+          "浏览器"
+        ]
+      },
+      "recommendedSkills": [
+        "webapp-testing",
+        "agent-browser",
+        "web-access",
+        "mcp-chrome-devtools",
+        "playwright",
+        "playwright-interactive"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "e2e-plan.md"
+      ],
+      "requiredVerification": [
+        "browser-run",
+        "screenshot",
+        "console-log"
+      ]
+    },
+    "desktopAutomation": {
+      "detect": {
+        "files": [
+          "tests/desktop/**",
+          "desktop/**",
+          "e2e/desktop/**"
+        ],
+        "keywords": [
+          "desktop automation",
+          "desktop app",
+          "computer use",
+          "cua",
+          "gui automation",
+          "operate desktop",
+          "windows desktop",
+          "wps",
+          "wechat",
+          "weixin",
+          "office app"
+        ]
+      },
+      "requiredSkills": [
+        "turix-cua"
+      ],
+      "recommendedSkills": [
+        "agent-browser",
+        "web-access",
+        "computer-use",
+        "opencli"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "verification.md"
+      ],
+      "requiredVerification": [
+        "desktop-screenshot",
+        "operator-safety",
+        "side-effect-boundary"
+      ],
+      "blockLevels": [
+        "CRITICAL"
+      ]
+    },
+    "externalCli": {
+      "detect": {
+        "files": [
+          "scripts/**",
+          ".github/workflows/**"
+        ],
+        "keywords": [
+          "external cli",
+          "agent cli",
+          "codex",
+          "codex cli",
+          "claude code",
+          "gemini cli",
+          "opencode",
+          "aider",
+          "cross-agent",
+          "subagent",
+          "wps cli",
+          "wechat automation"
+        ]
+      },
+      "recommendedSkills": [
+        "codex-cli",
+        "gemini-cli",
+        "opencode-cli",
+        "git-workflow-and-versioning",
+        "code-reviewer"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "verification.md"
+      ],
+      "requiredVerification": [
+        "cli-version-check",
+        "command-output",
+        "dry-run-or-safe-mode",
+        "side-effect-boundary"
+      ]
+    },
+    "api": {
+      "detect": {
+        "files": [
+          "**/api/**",
+          "**/routes/**",
+          "**/controller/**",
+          "**/*.api",
+          "**/*.proto"
+        ],
+        "keywords": [
+          "api",
+          "endpoint",
+          "route",
+          "handler",
+          "接口",
+          "路由"
+        ]
+      },
+      "recommendedSkills": [
+        "tdd-guide",
+        "code-review"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "mini-prd.md",
+        "api-contract.md"
+      ],
+      "requiredVerification": [
+        "contract-check"
+      ]
+    },
+    "db": {
+      "detect": {
+        "files": [
+          "**/migration/**",
+          "**/migrations/**",
+          "**/*.sql",
+          "**/schema.*",
+          "**/model/**"
+        ],
+        "keywords": [
+          "database",
+          "db",
+          "migration",
+          "schema",
+          "sql",
+          "数据表",
+          "数据库",
+          "迁移"
+        ]
+      },
+      "requiredSkills": [
+        "security-review"
+      ],
+      "recommendedSkills": [
+        "systematic-debugging"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "db-change-plan.md",
+        "security-review.md"
+      ],
+      "requiredVerification": [
+        "rollback-plan",
+        "migration-test"
+      ]
+    },
+    "security": {
+      "detect": {
+        "files": [
+          "**/auth/**",
+          "**/permission/**",
+          "**/security/**",
+          "**/middleware/**"
+        ],
+        "keywords": [
+          "auth",
+          "permission",
+          "tenant",
+          "token",
+          "credential",
+          "secret",
+          "rbac",
+          "鉴权",
+          "权限",
+          "租户",
+          "密钥"
+        ]
+      },
+      "requiredSkills": [
+        "security-review"
+      ],
+      "recommendedSkills": [
+        "code-review"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "security-review.md"
+      ],
+      "requiredVerification": [
+        "threat-model",
+        "rollback-plan"
+      ],
+      "blockLevels": [
+        "CRITICAL"
+      ]
+    },
+    "docs": {
+      "detect": {
+        "files": [
+          "docs/**",
+          "**/*.md"
+        ],
+        "keywords": [
+          "docs",
+          "documentation",
+          "document",
+          "readme",
+          "文档"
+        ]
+      },
+      "recommendedSkills": [
+        "update-docs",
+        "workflow-guide"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "docs-impact.md"
+      ]
+    },
+    "resourceGovernance": {
+      "detect": {
+        "files": [
+          ".scale/resource-policy.json",
+          ".scale/assets.json",
+          "docs/modules/**",
+          "docs/decisions/**",
+          "docs/worklog/tasks/**",
+          "test-results/**",
+          "playwright-report/**",
+          "coverage/**",
+          "tmp/**",
+          "scripts/tmp/**",
+          "**/*.png",
+          "**/*.jpg",
+          "**/*.jpeg",
+          "**/*.webp",
+          "**/*.gif",
+          "**/*.mp4",
+          "**/*.webm",
+          "**/*.mov",
+          "**/*.wav",
+          "**/*.mp3"
+        ],
+        "keywords": [
+          "asset",
+          "resource",
+          "artifact retention",
+          "lifecycle",
+          "temporary file",
+          "e2e report",
+          "screenshot",
+          "video",
+          "documentation drift",
+          "resource governance"
+        ]
+      },
+      "recommendedSkills": [
+        "documentation-and-adrs",
+        "git-workflow-and-versioning",
+        "ai-slop-cleaner"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "docs-impact.md",
+        "resource-impact.md"
+      ],
+      "requiredVerification": [
+        "asset-scan",
+        "asset-doctor"
+      ]
+    },
+    "engineeringStandards": {
+      "detect": {
+        "files": [
+          ".scale/engineering-standards.json",
+          ".scale/frameworks.json",
+          "docs/standards/**",
+          "src/**",
+          "app/**",
+          "packages/**",
+          "services/**",
+          "internal/**",
+          "pkg/**"
+        ],
+        "keywords": [
+          "coding standard",
+          "engineering standard",
+          "logging",
+          "redaction",
+          "desensitization",
+          "orm",
+          "framework convention",
+          "architecture boundary",
+          "design pattern",
+          "test rigor",
+          "sql injection",
+          "xss",
+          "脱敏",
+          "日志",
+          "架构规范",
+          "编码规范",
+          "框架规范",
+          "联调",
+          "发版"
+        ]
+      },
+      "recommendedSkills": [
+        "code-review-and-quality",
+        "security-and-hardening",
+        "documentation-and-adrs"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "standards-impact.md",
+        "architecture-review.md",
+        "security-review.md"
+      ],
+      "requiredVerification": [
+        "standards-scan",
+        "standards-doctor"
+      ],
+      "blockLevels": [
+        "L",
+        "CRITICAL"
+      ]
+    },
+    "review": {
+      "detect": {
+        "files": [
+          ".github/PULL_REQUEST_TEMPLATE.md",
+          ".github/pull_request_template.md"
+        ],
+        "keywords": [
+          "review",
+          "code review",
+          "pull request",
+          "pr",
+          "merge request",
+          "changes reviewed",
+          "审查",
+          "评审"
+        ]
+      },
+      "requiredSkills": [
+        "code-reviewer"
+      ],
+      "recommendedSkills": [
+        "pr-creator"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "review.md"
+      ],
+      "requiredVerification": [
+        "review-evidence"
+      ]
+    },
+    "release": {
+      "detect": {
+        "files": [
+          "CHANGELOG.md",
+          "package.json",
+          ".github/workflows/**"
+        ],
+        "keywords": [
+          "release",
+          "ship",
+          "publish",
+          "deploy",
+          "pull request",
+          "pr",
+          "发版",
+          "发布",
+          "部署"
+        ]
+      },
+      "requiredSkills": [
+        "code-reviewer"
+      ],
+      "recommendedSkills": [
+        "pr-creator",
+        "fix",
+        "verification",
+        "code-review"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "review.md",
+        "summary.md"
+      ],
+      "requiredVerification": [
+        "preflight"
+      ]
+    },
+    "skillDiscovery": {
+      "detect": {
+        "keywords": [
+          "skill",
+          "capability",
+          "missing capability",
+          "install skill",
+          "find skill"
+        ]
+      },
+      "recommendedSkills": [
+        "find-skills"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md"
+      ]
+    },
+    "fullstackPrototype": {
+      "detect": {
+        "keywords": [
+          "fullstack",
+          "full-stack",
+          "mvp",
+          "prototype",
+          "next.js",
+          "react api",
+          "node api"
+        ]
+      },
+      "recommendedSkills": [
+        "fullstack-developer"
+      ],
+      "requiredArtifacts": [
+        "skill-plan.md",
+        "skill-evidence.md",
+        "mini-prd.md",
+        "api-contract.md"
+      ],
+      "requiredVerification": [
+        "preflight"
+      ]
+    }
+  }
+}

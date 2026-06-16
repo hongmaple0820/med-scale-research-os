@@ -1,0 +1,22 @@
+{
+  "session_start": [
+    {
+      "command": "scale session start --agent codex --session-id $CODEX_SESSION_ID"
+    }
+  ],
+  "pre_tool_use": [
+    {
+      "command": "scale gate pre-tool $CODEX_TOOL_NAME --args-json $CODEX_TOOL_INPUT --session-id $CODEX_SESSION_ID"
+    }
+  ],
+  "post_tool_use": [
+    {
+      "command": "scale gate post-tool $CODEX_TOOL_NAME --output-json $CODEX_TOOL_OUTPUT --exit-code $CODEX_TOOL_EXIT --session-id $CODEX_SESSION_ID"
+    }
+  ],
+  "session_end": [
+    {
+      "command": "scale session end --session-id $CODEX_SESSION_ID"
+    }
+  ]
+}

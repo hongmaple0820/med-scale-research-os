@@ -1,0 +1,9 @@
+{
+  "name": "puppeteer",
+  "description": "Browser automation alternative",
+  "command": "npx",
+  "args": ["-y", "@anthropic/mcp-puppeteer"],
+  "env": {},
+  "tools": ["navigate", "click", "screenshot", "evaluate"],
+  "whenToUse": "Browser automation with headless Chrome"
+}

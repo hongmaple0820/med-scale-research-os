@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "sourceFormat": "markdown",
+  "artifactDirectory": "artifacts",
+  "manifestFile": "artifact-manifest.json",
+  "defaultTheme": "auto",
+  "defaultGitPolicy": "review",
+  "safety": {
+    "allowRemoteScripts": false,
+    "allowRemoteStyles": false,
+    "detectSecrets": true
+  },
+  "templates": {
+    "plan-comparison": {
+      "label": "Plan Comparison",
+      "sources": [
+        "mini-prd.md",
+        "explore.md",
+        "plan.md"
+      ],
+      "description": "Compare candidate approaches, tradeoffs, open questions, and decision criteria."
+    },
+    "implementation-plan": {
+      "label": "Implementation Plan",
+      "sources": [
+        "plan.md",
+        "verification.md"
+      ],
+      "description": "Convert the implementation plan and verification strategy into a scannable delivery surface."
+    },
+    "code-review": {
+      "label": "Code Review",
+      "sources": [
+        "review.md",
+        "security-review.md",
+        "standards-impact.md"
+      ],
+      "description": "Summarize review findings, severity, evidence, and residual risks."
+    },
+    "status-report": {
+      "label": "Status Report",
+      "sources": [
+        "summary.md",
+        "verification.md",
+        "resource-impact.md",
+        "standards-impact.md"
+      ],
+      "description": "Show current task status, proof, blockers, resource state, and follow-ups."
+    },
+    "incident-report": {
+      "label": "Incident Report",
+      "sources": [
+        "explore.md",
+        "plan.md",
+        "verification.md",
+        "review.md"
+      ],
+      "description": "Explain incident context, diagnosis, fix, validation, and prevention work."
+    },
+    "release-report": {
+      "label": "Release Report",
+      "sources": [
+        "summary.md",
+        "verification.md",
+        "review.md",
+        "resource-impact.md",
+        "standards-impact.md"
+      ],
+      "description": "Package final release evidence, risk state, unverified items, and sign-off readiness."
+    }
+  }
+}

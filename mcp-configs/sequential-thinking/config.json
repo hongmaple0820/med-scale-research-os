@@ -1,0 +1,9 @@
+{
+  "name": "sequential-thinking",
+  "description": "Deep reasoning with structured thoughts",
+  "command": "npx",
+  "args": ["-y", "@anthropic/mcp-sequential-thinking"],
+  "env": {},
+  "tools": ["think", "branch", "conclude"],
+  "whenToUse": "Complex problems requiring step-by-step reasoning"
+}

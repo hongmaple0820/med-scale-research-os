@@ -1,0 +1,80 @@
+# 功能实现工作流模板
+# TDD 流程：测试 -> 实现 -> 验证 -> 文档
+
+name: feature-implementation-workflow
+description: TDD 功能实现工作流
+version: "1.0.0"
+
+llm:
+  provider: claude-code
+  model: claude-sonnet-4
+
+concurrency: 4
+
+inputs:
+  - name: feature_name
+    required: true
+    description: 功能名称
+  - name: spec_file
+    required: true
+    description: 规格文档路径
+
+steps:
+  # Level 0: 并行设计
+  - id: design-api
+    role: engineering/backend-agent
+    task: 设计 API 接口和数据模型
+    output: api_design
+
+  - id: design-ui
+    role: engineering/frontend-agent
+    task: 设计 UI 组件和交互流程
+    output: ui_design
+
+  - id: plan-tests
+    role: engineering/test-agent
+    task: 规划测试用例（单元、集成、E2E）
+    output: test_plan
+
+  # Level 1: 并行实现（依赖设计）
+  - id: implement-backend
+    role: engineering/backend-agent
+    task: 实现 {{api_design}}，包含数据库操作
+    depends_on: [design-api]
+    output: backend_code
+    retry: 1
+
+  - id: implement-frontend
+    role: engineering/frontend-agent
+    task: 实现 {{ui_design}}，包含状态管理
+    depends_on: [design-ui]
+    output: frontend_code
+    retry: 1
+
+  - id: implement-tests
+    role: engineering/test-agent
+    task: 实现 {{test_plan}}
+    depends_on: [plan-tests, design-api, design-ui]
+    output: test_code
+
+  # Level 2: 验证和审查
+  - id: verify-tests
+    role: engineering/test-agent
+    task: 运行测试验证 {{backend_code}} 和 {{frontend_code}}
+    depends_on: [implement-backend, implement-frontend, implement-tests]
+    output: test_results
+
+  - id: review-code
+    role: engineering/code-review-agent
+    task: 审查 {{backend_code}} 和 {{frontend_code}} 的代码质量
+    depends_on: [implement-backend, implement-frontend]
+    output: review_results
+
+  # Level 3: 文档和报告
+  - id: generate-docs
+    role: engineering/docs-agent
+    task: 生成功能文档，包含 API 文档和用户指南
+    depends_on: [verify-tests, review-code]
+    output: documentation
+
+output_dir: ao-output/feature-{{feature_name}}

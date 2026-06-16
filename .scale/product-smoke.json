@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "gate": "warn",
+  "requiredForLevels": [
+    "M",
+    "L",
+    "CRITICAL"
+  ],
+  "emptyProbeBehavior": "block",
+  "setupGuide": [
+    "Set probes[].enabled=true only after replacing the example command with a real product path.",
+    "Use a command that crosses the real boundary: client/UI -> gateway/router -> service -> persistence or observable result.",
+    "Run: scale preflight --profile productSmoke --json",
+    "Run: scale runtime final-check --level M --json"
+  ],
+  "runtimeEvidence": {
+    "requiredKind": "command",
+    "requiredStatus": "passed",
+    "requireArtifacts": true
+  },
+  "probes": [
+    {
+      "id": "example-business-flow",
+      "enabled": false,
+      "description": "Replace with a real user/product path such as UI -> gateway -> service -> database/storage.",
+      "command": "curl -fsS http://127.0.0.1:3000/health",
+      "expected": {
+        "exitCode": 0,
+        "evidenceArtifact": ".agent/logs/product-smoke.json"
+      }
+    }
+  ]
+}

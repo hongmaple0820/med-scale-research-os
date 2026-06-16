@@ -1,0 +1,11 @@
+{
+  "name": "postgres",
+  "description": "PostgreSQL database operations",
+  "command": "npx",
+  "args": ["-y", "@anthropic/mcp-postgres"],
+  "env": {
+    "POSTGRES_URL": "${POSTGRES_URL}"
+  },
+  "tools": ["query", "execute", "describe_table"],
+  "whenToUse": "Database queries and schema operations"
+}

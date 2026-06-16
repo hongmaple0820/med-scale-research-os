@@ -1,0 +1,9 @@
+{
+  "name": "playwright",
+  "description": "Browser automation for E2E testing",
+  "command": "npx",
+  "args": ["-y", "@anthropic/mcp-playwright"],
+  "env": {},
+  "tools": ["navigate", "click", "fill", "screenshot", "evaluate"],
+  "whenToUse": "E2E testing, browser automation"
+}

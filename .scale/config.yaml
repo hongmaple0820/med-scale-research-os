@@ -1,0 +1,61 @@
+# SCALE Engine Configuration
+# Profile: Advanced — Full governance: guardrails + graphify knowledge recall + gbrain memory routing + evolution + model routing.
+# Customize below, or change profile with: scale config profile <id>
+
+version: 1
+profile: advanced
+
+project:
+  name: scale-engine
+
+storage:
+  db: .scale/scale.db
+  events: .scale/events
+  artifacts: .scale/artifacts
+  knowledge:
+    backend: graphify
+    graph: graphify-out/graph.json
+  memory:
+    provider: gbrain
+
+guardrails:
+  preTool:
+    enabled: true
+    detectors:
+      - dangerous-command
+      - role-permission
+      - brute-retry
+      - premature-done
+      - blame-shift
+      - idle-tool
+      - busy-loop
+  postTool:
+    enabled: true
+    autoLint:
+      enabled: true
+  beforeStop:
+    enabled: true
+    requireVerification: true
+
+knowledge:
+  extraction:
+    enabled: true
+  recall:
+    topK: 3
+    minRelevance: 0.4
+
+evolution:
+  enabled: true
+  autoApprove: false
+
+models:
+  defaults:
+    explore: claude-haiku
+    plan: claude-sonnet-4-5
+    implement: claude-sonnet-4-5
+    verify: claude-haiku
+    architect: claude-opus-4-5
+
+logging:
+  level: info
+  file: .scale/scale.log

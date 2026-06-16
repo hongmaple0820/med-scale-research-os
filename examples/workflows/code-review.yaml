@@ -1,0 +1,59 @@
+# 代码审查工作流模板
+# 使用 DAG 并行执行前端和后端审查
+
+name: code-review-workflow
+description: 多 Agent 并行代码审查工作流
+version: "1.0.0"
+
+llm:
+  provider: claude-code
+  model: claude-sonnet-4
+
+concurrency: 3  # 最大并行步骤数
+
+inputs:
+  - name: target_branch
+    required: true
+    description: 要审查的目标分支
+  - name: review_depth
+    required: false
+    default: "standard"
+    description: 审查深度 (quick/standard/deep)
+
+steps:
+  # Level 0: 并行分析
+  - id: analyze-frontend
+    role: engineering/frontend-agent
+    task: 分析前端代码变更，检查 UI 组件、样式、交互逻辑
+    output: frontend_analysis
+    timeout: 120
+
+  - id: analyze-backend
+    role: engineering/backend-agent
+    task: 分析后端代码变更，检查 API、数据库操作、业务逻辑
+    output: backend_analysis
+    timeout: 120
+
+  - id: analyze-security
+    role: engineering/security-agent
+    task: 安全审查，检查 OWASP Top 10 漏洞、认证授权
+    output: security_analysis
+    timeout: 180
+
+  # Level 1: 依赖分析结果的审查
+  - id: review-code
+    role: engineering/code-review-agent
+    task: 综合审查 {{frontend_analysis}} 和 {{backend_analysis}}，评估代码质量
+    depends_on: [analyze-frontend, analyze-backend]
+    output: code_review
+    timeout: 150
+
+  # Level 2: 最终报告
+  - id: generate-report
+    role: engineering/docs-agent
+    task: 生成审查报告，包含 {{code_review}} 和 {{security_analysis}} 的结果
+    depends_on: [review-code, analyze-security]
+    output: final_report
+    timeout: 60
+
+output_dir: ao-output/code-review

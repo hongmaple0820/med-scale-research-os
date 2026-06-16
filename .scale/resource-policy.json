@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "maxGitFileSizeBytes": 5242880,
+  "ignoredDirectories": [
+    ".git",
+    "node_modules",
+    "dist",
+    "build",
+    "vendor",
+    ".next",
+    ".turbo"
+  ],
+  "retainedRuntimeDirectories": [
+    ".scale/tmp",
+    ".scale/evidence",
+    ".scale/reports",
+    ".scale/resource-reports",
+    "tmp",
+    "temp",
+    "test-results",
+    "playwright-report",
+    "coverage"
+  ],
+  "owners": {
+    "docs": "engineering",
+    "docs/standards": "engineering",
+    "docs/workflow": "engineering",
+    "docs/decisions": "architecture",
+    "docs/modules": "module-owner",
+    ".scale": "engineering"
+  },
+  "modules": {
+    "workflow": {
+      "path": "src/workflow",
+      "owner": "engineering"
+    },
+    "skills": {
+      "path": "src/skills",
+      "owner": "engineering"
+    },
+    "api": {
+      "path": "src/api",
+      "owner": "engineering"
+    }
+  }
+}

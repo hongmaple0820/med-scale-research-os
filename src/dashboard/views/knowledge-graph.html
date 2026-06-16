@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCALE Engine — Knowledge Graph</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; }
+    nav { background: #1a1a1a; padding: 1rem; display: flex; gap: 1rem; }
+    nav a { color: #808080; text-decoration: none; }
+    nav a:hover { color: #fff; }
+    nav a.active { color: #00ff88; }
+    main { padding: 2rem; }
+    h1 { color: #00ff88; margin-bottom: 1rem; }
+    .list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .entry { background: #1a1a1a; padding: 1rem; border-radius: 8px; display: flex; justify-content: space-between; }
+    .type { color: #00ff88; font-size: 0.75rem; }
+    .relevance { color: #808080; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Artifacts</a>
+    <a href="/sessions">Sessions</a>
+    <a href="/knowledge" class="active">Knowledge</a>
+    <a href="/evolution">Evolution</a>
+    <a href="/agents">Agents</a>
+  </nav>
+  <main>
+    <h1>Knowledge Graph</h1>
+    <div class="list" id="knowledge"></div>
+  </main>
+  <script>
+    async function loadKnowledge() {
+      const res = await fetch('/api/knowledge')
+      const knowledge = await res.json()
+      const list = document.getElementById('knowledge')
+      list.innerHTML = knowledge.map(k => `
+        <div class="entry">
+          <div>
+            <span class="type">${k.type}</span>
+            <span>${k.title}</span>
+          </div>
+          <span class="relevance">${k.relevance.toFixed(2)}</span>
+        </div>
+      `).join('')
+    }
+    loadKnowledge()
+  </script>
+</body>
+</html>

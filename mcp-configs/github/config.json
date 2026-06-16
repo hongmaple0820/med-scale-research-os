@@ -1,0 +1,11 @@
+{
+  "name": "github",
+  "description": "GitHub API operations",
+  "command": "npx",
+  "args": ["-y", "@anthropic/mcp-github"],
+  "env": {
+    "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+  },
+  "tools": ["create_issue", "create_pr", "search_repos", "get_file_contents"],
+  "whenToUse": "GitHub workflows, PRs, issues"
+}

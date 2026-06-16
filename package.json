@@ -1,0 +1,113 @@
+{
+  "name": "@hongmaple0820/med-scale-research-os",
+  "version": "0.43.0",
+  "description": "MedSCALE Research OS: evidence-driven medical research workflow with literature review, fact checks, package audit, memory review, and a researcher dashboard",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hongmaple0820/med-scale-research-os.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hongmaple0820/med-scale-research-os/issues"
+  },
+  "homepage": "https://github.com/hongmaple0820/med-scale-research-os#readme",
+  "type": "module",
+  "bin": {
+    "medscale": "dist/api/medscale.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "target-research-platform/main.py",
+    "target-research-platform/bridge_runner.py",
+    "target-research-platform/run_dashboard.py",
+    "target-research-platform/run_real_medical_workflow.py",
+    "target-research-platform/config.yaml",
+    "target-research-platform/requirements.txt",
+    "target-research-platform/pyproject.toml",
+    "target-research-platform/src",
+    "target-research-platform/scripts",
+    "target-research-platform/docs",
+    "target-research-platform/data",
+    ".scale/skills.json",
+    ".scale/mcp-servers.yaml",
+    ".scale/verification.json",
+    "mcp-configs",
+    "docs/README.md",
+    "docs/zh",
+    "docs/guides",
+    "docs/start",
+    "docs/workflow",
+    "docs/reference",
+    "examples/demo-projects/agent-governance-demo",
+    "scripts/workflow/lib",
+    "scripts/workflow/medscale-release-smoke.mjs",
+    "scripts/workflow/setup-smoke.mjs",
+    "scripts/workflow/provider-rehearsal.mjs"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "bun --watch src/api/cli.ts",
+    "medscale": "tsx src/api/medscale.ts",
+    "test": "vitest run --reporter dot --pool=forks --maxWorkers=4 --minWorkers=1",
+    "test:serial": "vitest run --reporter dot --pool=forks --poolOptions.forks.maxForks=1 --poolOptions.forks.minForks=1",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/**/*.ts",
+    "docs:cli": "npm run build && node scripts/generate-cli-reference.mjs",
+    "smoke:setup": "node scripts/workflow/setup-smoke.mjs",
+    "smoke:medscale-release": "npm run build && node scripts/workflow/medscale-release-smoke.mjs",
+    "smoke:providers": "node scripts/workflow/provider-rehearsal.mjs",
+    "smoke:gbrain": "node scripts/workflow/provider-rehearsal.mjs --skip-graphify --require-gbrain",
+    "smoke:graphify": "node scripts/workflow/provider-rehearsal.mjs --skip-gbrain --require-graphify",
+    "release:check": "npm run typecheck && npm run lint && npm test && npm run smoke:setup && npm run smoke:providers -- --write-report && npm run smoke:medscale-release && npm audit --omit=dev && git diff --check && npm pack --dry-run",
+    "release:medscale": "npm run typecheck && npm test -- tests/cli/targetCommands.test.ts tests/cli/medscaleCli.test.ts tests/memory/MemoryReview.test.ts && npm run smoke:medscale-release",
+    "mcp": "node dist/api/mcp.js",
+    "serve": "node dist/api/http.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "better-sqlite3": "^11.10.0",
+    "chokidar": "^3.6.0",
+    "citty": "^0.1.6",
+    "content-type": "1.0.5",
+    "element-plus": "^2.8.8",
+    "execa": "^9.3.0",
+    "hono": "^4.5.0",
+    "js-yaml": "^4.1.0",
+    "pino": "^9.3.0",
+    "pino-pretty": "^11.2.0",
+    "type-is": "2.0.1",
+    "vue": "^3.5.17",
+    "zod": "^3.23.0"
+  },
+  "overrides": {
+    "content-type": "1.0.5",
+    "type-is": "2.0.1",
+    "qs": "6.15.2"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.50.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/parser": "^8.59.3",
+    "eslint": "^9.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

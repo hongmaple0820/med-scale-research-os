@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "path": "docs/RESOURCE_GOVERNANCE.md",
+      "type": "canonical-doc",
+      "owner": "engineering",
+      "module": "workflow",
+      "sourceOfTruth": true,
+      "lifecycle": "maintained",
+      "gitPolicy": "commit",
+      "lastReviewedAt": "2026-05-15",
+      "reviewIntervalDays": 90
+    },
+    {
+      "path": "docs/ENGINEERING_STANDARDS.md",
+      "type": "canonical-doc",
+      "owner": "engineering",
+      "module": "workflow",
+      "sourceOfTruth": true,
+      "lifecycle": "maintained",
+      "gitPolicy": "commit",
+      "lastReviewedAt": "2026-05-15",
+      "reviewIntervalDays": 90
+    },
+    {
+      "path": "src/workflow/ResourceGovernance.ts",
+      "type": "reusable-script",
+      "owner": "engineering",
+      "module": "workflow",
+      "sourceOfTruth": true,
+      "lifecycle": "maintained",
+      "gitPolicy": "commit",
+      "lastReviewedAt": "2026-05-15",
+      "reviewIntervalDays": 90
+    },
+    {
+      "path": "src/workflow/EngineeringStandards.ts",
+      "type": "reusable-script",
+      "owner": "engineering",
+      "module": "workflow",
+      "sourceOfTruth": true,
+      "lifecycle": "maintained",
+      "gitPolicy": "commit",
+      "lastReviewedAt": "2026-05-15",
+      "reviewIntervalDays": 90
+    }
+  ]
+}

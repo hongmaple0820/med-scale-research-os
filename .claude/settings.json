@@ -1,0 +1,92 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "WebSearch",
+      "WebFetch",
+      "Agent",
+      "Skill",
+      "Bash(rtk *: *)",
+      "Bash(bash scripts/*: *)",
+      "Bash(bash scripts/hooks/*: *)",
+      "Bash(bash .claude/hooks/*: *)",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File scripts/*: *)",
+      "Write(.claude/**)",
+      "Write(.agent/**)",
+      "Write(.scale/**)",
+      "Write(docs/**)",
+      "Write(scripts/**)",
+      "Write(README.md)",
+      "Write(AGENTS.md)",
+      "Write(CLAUDE.md)",
+      "Write(Makefile)",
+      "Write(.gitignore)",
+      "Edit(.claude/**)",
+      "Edit(.agent/**)",
+      "Edit(.scale/**)",
+      "Edit(docs/**)",
+      "Edit(scripts/**)",
+      "Edit(README.md)",
+      "Edit(AGENTS.md)",
+      "Edit(CLAUDE.md)",
+      "Edit(Makefile)",
+      "Edit(.gitignore)"
+    ],
+    "deny": [
+      "Write(.env*)",
+      "Edit(.env*)",
+      "Write(*secret*)",
+      "Edit(*secret*)",
+      "Write(*token*)",
+      "Edit(*token*)",
+      "Write(*password*)",
+      "Edit(*password*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "command": "bash .claude/hooks/session-start-reminder.sh",
+        "timeout": 3000,
+        "description": "Show concise scale-engine workflow entry points."
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "command": "bash scripts/hooks/check-dangerous-file.sh",
+        "timeout": 3000,
+        "description": "Block edits to secrets, runtime databases, and generated dependency output."
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "command": "bash scripts/hooks/check-explore.sh",
+        "timeout": 3000,
+        "description": "Require recorded exploration before medium or larger source changes."
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "command": "bash scripts/hooks/check-tdd.sh",
+        "timeout": 3000,
+        "description": "Warn when TypeScript implementation changes lack nearby test evidence."
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "command": "bash .claude/hooks/gate-execute-phase.sh",
+        "timeout": 3000,
+        "description": "Route code edits through the repository workflow phase gates."
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "command": "bash .claude/hooks/session-end-gate.sh",
+        "timeout": 5000,
+        "description": "Summarize uncommitted code changes and verification expectations before handoff."
+      }
+    ]
+  }
+}

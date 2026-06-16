@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "topology": "single",
+  "repositories": [
+    {
+      "name": "root",
+      "path": ".",
+      "role": "root",
+      "required": true
+    }
+  ],
+  "branchPolicy": {
+    "mode": "gitlab-flow",
+    "integrationBranch": "dev",
+    "productionBranch": "master",
+    "protectedBranches": [
+      "dev",
+      "master",
+      "main"
+    ],
+    "featurePrefixes": [
+      "feature/",
+      "feat/",
+      "fix/",
+      "chore/",
+      "docs/",
+      "codex/"
+    ],
+    "releasePrefixes": [
+      "release/"
+    ],
+    "hotfixPrefixes": [
+      "hotfix/"
+    ],
+    "requireAuthorScopeDate": true
+  },
+  "finishPolicy": {
+    "requireCleanRepositories": true,
+    "requirePushedBranches": true,
+    "requireRootPointerUpdate": false,
+    "requireReviewArtifacts": false
+  }
+}

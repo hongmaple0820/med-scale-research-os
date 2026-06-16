@@ -1,0 +1,50 @@
+# 产品评审工作流模板
+# 需求分析 -> 设计评审 -> 技术可行性评估
+
+name: product-review-workflow
+description: 产品需求评审工作流
+version: "1.0.0"
+
+llm:
+  provider: claude-code
+  model: claude-opus-4
+
+concurrency: 2
+
+inputs:
+  - name: prd_file
+    required: true
+    description: PRD 文件路径
+  - name: stakeholders
+    required: false
+    default: "tech,design,business"
+    description: 参与评审的角色
+
+steps:
+  # Level 0: 并行分析
+  - id: analyze-requirements
+    role: engineering/product-agent
+    task: 分析 {{prd_file}} 的需求完整性和优先级合理性
+    output: requirements_analysis
+
+  - id: analyze-design
+    role: engineering/ui-design-agent
+    task: 评估设计方案的可行性和用户体验
+    output: design_analysis
+
+  # Level 1: 技术可行性评估
+  - id: assess-feasibility
+    role: engineering/architect-agent
+    task: 基于 {{requirements_analysis}} 和 {{design_analysis}} 评估技术可行性
+    depends_on: [analyze-requirements, analyze-design]
+    output: feasibility_report
+    retry: 2
+
+  # Level 2: 最终评审报告
+  - id: generate-review-report
+    role: engineering/docs-agent
+    task: 生成产品评审报告，包含需求/设计/可行性分析
+    depends_on: [assess-feasibility]
+    output: review_report
+
+output_dir: ao-output/product-review

@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "mode": "evidence-required",
+  "tools": {
+    "web-access": {
+      "enabled": true,
+      "requiredFor": [
+        "webResearch"
+      ],
+      "recommendedFor": [
+        "browserAutomation"
+      ],
+      "destructiveActions": "block",
+      "evidenceRequired": true
+    },
+    "awesome-design-md": {
+      "enabled": true,
+      "requiredFor": [
+        "ui"
+      ],
+      "destructiveActions": "block",
+      "evidenceRequired": true
+    },
+    "ui-ux-pro-max": {
+      "enabled": true,
+      "requiredFor": [
+        "ui"
+      ],
+      "destructiveActions": "block",
+      "evidenceRequired": true
+    },
+    "frontend-design": {
+      "enabled": true,
+      "requiredFor": [],
+      "recommendedFor": [
+        "ui"
+      ],
+      "destructiveActions": "block",
+      "evidenceRequired": true
+    },
+    "agent-browser": {
+      "enabled": true,
+      "requiredFor": [
+        "browserAutomation"
+      ],
+      "recommendedFor": [
+        "ui",
+        "e2e"
+      ],
+      "allowedDomains": [
+        "localhost",
+        "127.0.0.1"
+      ],
+      "destructiveActions": "confirm",
+      "command": "agent-browser",
+      "evidenceRequired": true
+    },
+    "playwright": {
+      "enabled": true,
+      "requiredFor": [
+        "e2e"
+      ],
+      "recommendedFor": [
+        "browserAutomation",
+        "ui"
+      ],
+      "destructiveActions": "confirm",
+      "command": "npx playwright",
+      "evidenceRequired": true
+    },
+    "mcp-chrome-devtools": {
+      "enabled": true,
+      "requiredFor": [
+        "browserAutomation"
+      ],
+      "recommendedFor": [
+        "ui",
+        "e2e"
+      ],
+      "destructiveActions": "confirm",
+      "mcpToolName": "chrome-devtools",
+      "evidenceRequired": true
+    },
+    "desktop-cua": {
+      "enabled": false,
+      "requiredFor": [
+        "desktopAutomation"
+      ],
+      "destructiveActions": "block",
+      "command": "cua",
+      "evidenceRequired": true
+    },
+    "codex-cli": {
+      "enabled": false,
+      "requiredFor": [],
+      "recommendedFor": [
+        "externalCli",
+        "review"
+      ],
+      "destructiveActions": "block",
+      "command": "codex",
+      "evidenceRequired": true
+    },
+    "rtk": {
+      "enabled": true,
+      "requiredFor": [
+        "externalCli"
+      ],
+      "recommendedFor": [
+        "review"
+      ],
+      "destructiveActions": "block",
+      "command": "rtk",
+      "evidenceRequired": true
+    },
+    "gemini-cli": {
+      "enabled": false,
+      "requiredFor": [],
+      "recommendedFor": [
+        "externalCli",
+        "review"
+      ],
+      "destructiveActions": "block",
+      "command": "gemini",
+      "evidenceRequired": true
+    },
+    "opencode-cli": {
+      "enabled": false,
+      "requiredFor": [],
+      "recommendedFor": [
+        "externalCli",
+        "review"
+      ],
+      "destructiveActions": "block",
+      "command": "opencode",
+      "evidenceRequired": true
+    }
+  }
+}

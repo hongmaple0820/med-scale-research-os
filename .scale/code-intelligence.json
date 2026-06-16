@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "providers": [
+    {
+      "id": "codegraph",
+      "type": "external-cli",
+      "enabled": true,
+      "command": "codegraph",
+      "capabilities": [
+        "symbols",
+        "callers",
+        "callees",
+        "impact",
+        "context",
+        "summary",
+        "module-map"
+      ],
+      "source": "https://github.com/colbymchenry/codegraph",
+      "installHint": "npx @colbymchenry/codegraph or npm i -g @colbymchenry/codegraph",
+      "projectInitHint": "codegraph init -i",
+      "serveCommand": "codegraph serve --mcp"
+    },
+    {
+      "id": "graphify",
+      "type": "artifact",
+      "enabled": true,
+      "manifest": "graphify-out/graph.json",
+      "capabilities": [
+        "symbols",
+        "callers",
+        "callees",
+        "impact",
+        "context",
+        "summary",
+        "module-map"
+      ],
+      "source": "https://github.com/safishamsi/graphify",
+      "installHint": "uv tool install graphify && graphify install --platform codex"
+    }
+  ],
+  "fallback": {
+    "enabled": true,
+    "tools": [
+      "internal-scan",
+      "rg",
+      "read"
+    ]
+  }
+}

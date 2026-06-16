@@ -1,0 +1,33 @@
+# GitLab CI template for SCALE Engine gate checks
+# Include in your .gitlab-ci.yml:
+#   include: '.gitlab/scale-gate.yml'
+
+.scale-gate-job:
+  image: node:20
+  before_script:
+    - npm install -g @hongmaple0820/scale-engine
+  artifacts:
+    when: always
+    paths:
+      - .scale/evidence/
+      - scale-gates.json
+    expire_in: 30 days
+
+scale-preflight:
+  extends: .scale-gate-job
+  stage: test
+  script:
+    - scale preflight --json --profile ci | tee scale-gates.json
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+
+scale-qa:
+  extends: .scale-gate-job
+  stage: test
+  script:
+    - npx playwright install --with-deps chromium
+    - scale qa e2e --url "$DEPLOY_URL" --json | tee scale-qa.json
+  rules:
+    - if: $DEPLOY_URL != ""
+  needs: []

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCALE Engine — Evolution Metrics</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; }
+    nav { background: #1a1a1a; padding: 1rem; display: flex; gap: 1rem; }
+    nav a { color: #808080; text-decoration: none; }
+    nav a:hover { color: #fff; }
+    nav a.active { color: #00ff88; }
+    main { padding: 2rem; }
+    h1 { color: #00ff88; margin-bottom: 1rem; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .metric { background: #1a1a1a; border: 1px solid #333; padding: 2rem; border-radius: 8px; text-align: center; }
+    .metric h2 { font-size: 3rem; color: #00ff88; }
+    .metric p { color: #808080; }
+    .pipeline { margin-top: 2rem; display: flex; justify-content: center; gap: 2rem; }
+    .stage { background: #1a1a1a; padding: 1rem 2rem; border-radius: 8px; border: 1px solid #333; }
+    .stage.active { border-color: #00ff88; }
+    .arrow { color: #808080; font-size: 2rem; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Artifacts</a>
+    <a href="/sessions">Sessions</a>
+    <a href="/knowledge">Knowledge</a>
+    <a href="/evolution" class="active">Evolution</a>
+    <a href="/agents">Agents</a>
+  </nav>
+  <main>
+    <h1>Evolution Metrics</h1>
+    <div class="metrics">
+      <div class="metric">
+        <h2 id="lessons">0</h2>
+        <p>Lessons Extracted</p>
+      </div>
+      <div class="metric">
+        <h2 id="rules">0</h2>
+        <p>Rules Proposed</p>
+      </div>
+      <div class="metric">
+        <h2 id="approved">0</h2>
+        <p>Rules Approved</p>
+      </div>
+      <div class="metric">
+        <h2 id="hooks">0</h2>
+        <p>Hooks Generated</p>
+      </div>
+    </div>
+    <div class="pipeline">
+      <div class="stage">Defect</div>
+      <span class="arrow">→</span>
+      <div class="stage">Lesson</div>
+      <span class="arrow">→</span>
+      <div class="stage">Rule</div>
+      <span class="arrow">→</span>
+      <div class="stage active">Hook</div>
+    </div>
+  </main>
+  <script>
+    async function loadEvolution() {
+      const res = await fetch('/api/evolution')
+      const data = await res.json()
+      document.getElementById('lessons').textContent = data.lessonsExtracted
+      document.getElementById('rules').textContent = data.rulesProposed
+      document.getElementById('approved').textContent = data.rulesApproved
+      document.getElementById('hooks').textContent = data.hooksGenerated
+    }
+    loadEvolution()
+    setInterval(loadEvolution, 10000)
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "filesystem",
+  "description": "File system operations with sandboxing",
+  "command": "npx",
+  "args": ["-y", "@anthropic/mcp-filesystem", "/path/to/project"],
+  "env": {},
+  "tools": ["read_file", "write_file", "list_directory", "search_files"],
+  "whenToUse": "Safe file operations with path restrictions"
+}

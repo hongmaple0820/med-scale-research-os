@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "mode": "warn",
+  "sourceDirectories": [
+    "src",
+    "app",
+    "packages",
+    "services",
+    "cmd",
+    "internal",
+    "pkg"
+  ],
+  "ignoredDirectories": [
+    ".git",
+    ".scale",
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "test-results",
+    "playwright-report",
+    "tmp",
+    "temp",
+    "docs",
+    "tests",
+    "__tests__",
+    "e2e"
+  ],
+  "allowedConsoleDirectories": [
+    "src/api",
+    "src/cli",
+    "scripts"
+  ],
+  "allowedConsoleFiles": [
+    "src/dashboard/DashboardServer.ts"
+  ],
+  "maxFileLines": 500,
+  "logging": {
+    "approvedLoggers": [
+      "pino",
+      "winston",
+      "zap",
+      "zerolog",
+      "logrus",
+      "slog"
+    ],
+    "sensitiveFields": [
+      "password",
+      "passwd",
+      "token",
+      "accessToken",
+      "refreshToken",
+      "secret",
+      "authorization",
+      "cookie",
+      "apiKey",
+      "credential",
+      "privateKey"
+    ]
+  },
+  "architecture": {
+    "enforceLayering": true
+  },
+  "blockingRules": [],
+  "allowedFindingPatterns": [
+    {
+      "ruleId": "ad-hoc-console-log",
+      "path": "src/capabilities/InstalledSkillsIntegration.ts",
+      "evidencePattern": "python3 -c .*print\\(",
+      "reason": "Embedded local Python probes for document extraction are command strings, not runtime debug output."
+    }
+  ],
+  "baselineFindings": [
+    {
+      "ruleId": "empty-catch",
+      "path": "src/agents/AgentSourceLoader.ts",
+      "reason": "existing debt before standards governance; fix in a dedicated hardening task"
+    },
+    {
+      "ruleId": "sensitive-log",
+      "path": "src/api/cli.ts",
+      "reason": "CLI cleanup confirmation token wording; review separately before changing user-visible output"
+    },
+    {
+      "ruleId": "empty-catch",
+      "path": "src/api/cli.ts",
+      "reason": "existing debt before standards governance; fix in a dedicated hardening task"
+    },
+    {
+      "ruleId": "empty-catch",
+      "path": "src/artifact/sqliteStore.ts",
+      "reason": "existing debt before standards governance; fix in a dedicated storage hardening task"
+    },
+    {
+      "ruleId": "empty-catch",
+      "path": "src/context/ContextBuilder.ts",
+      "reason": "existing debt before standards governance; fix in a dedicated context hardening task"
+    },
+    {
+      "ruleId": "unsafe-code-execution",
+      "path": "src/hooks/HookGeneratorEnhanced.ts",
+      "reason": "hook syntax validation intentionally evaluates generated hook text; requires a dedicated safer parser review"
+    },
+    {
+      "ruleId": "empty-catch",
+      "path": "src/output/BrandThemeLoader.ts",
+      "reason": "existing debt before standards governance; fix in a dedicated output hardening task"
+    },
+    {
+      "ruleId": "empty-catch",
+      "path": "src/workflow/autonomous/AutonomousDevLoop.ts",
+      "reason": "existing debt before standards governance; fix in a dedicated autonomous workflow hardening task"
+    },
+    {
+      "ruleId": "empty-catch",
+      "path": "src/workflow/gates/GateSystem.ts",
+      "reason": "existing debt before standards governance; fix in a dedicated gate hardening task"
+    }
+  ]
+}

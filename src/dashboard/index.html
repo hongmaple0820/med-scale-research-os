@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCALE Engine Medical Workflow Dashboard</title>
+  <link rel="stylesheet" href="/static/vendor/element-plus/index.css">
+  <style>
+    :root {
+      --bg: #f4f7f8;
+      --surface: rgba(255, 255, 255, 0.82);
+      --surface-strong: #ffffff;
+      --surface-soft: #eef5f4;
+      --text: #16312f;
+      --muted: #5f7a76;
+      --line: rgba(26, 79, 73, 0.12);
+      --accent: #0f8a6d;
+      --accent-soft: rgba(15, 138, 109, 0.12);
+      --warning: #c37a1f;
+      --danger: #cf4c37;
+      --shadow: 0 18px 46px rgba(23, 54, 52, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(33, 160, 128, 0.22), transparent 30%),
+        radial-gradient(circle at top right, rgba(200, 123, 65, 0.16), transparent 22%),
+        linear-gradient(180deg, #f7fbfa 0%, var(--bg) 100%);
+      min-height: 100vh;
+    }
+
+    a { color: inherit; }
+
+    .page-shell {
+      max-width: 1460px;
+      margin: 0 auto;
+      padding: 28px 24px 40px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 28px;
+      padding: 28px 28px 24px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(241, 249, 247, 0.90)),
+        linear-gradient(120deg, rgba(15, 138, 109, 0.12), transparent 58%);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -60px;
+      top: -60px;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(15, 138, 109, 0.16), transparent 68%);
+      pointer-events: none;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.9fr);
+      gap: 20px;
+      align-items: end;
+      position: relative;
+      z-index: 1;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      margin: 14px 0 0;
+      max-width: 720px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .hero-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .meta-card {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--line);
+    }
+
+    .meta-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .meta-value {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .hero-side {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-self: stretch;
+    }
+
+    .hero-side-panel {
+      padding: 18px;
+      border-radius: 20px;
+      background: rgba(16, 51, 46, 0.92);
+      color: #edf7f3;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .hero-side-panel small {
+      color: rgba(237, 247, 243, 0.72);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .hero-side-panel strong {
+      margin-top: 8px;
+      display: block;
+      font-size: 16px;
+      line-height: 1.5;
+      font-weight: 600;
+    }
+
+    .dashboard-tabs {
+      margin-top: 20px;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 20px;
+      padding: 12px 14px 0;
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 10px 32px rgba(23, 54, 52, 0.06);
+    }
+
+    .dashboard-content {
+      margin-top: 18px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .overview-card,
+    .panel {
+      border-radius: 24px;
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.78);
+      box-shadow: 0 16px 40px rgba(23, 54, 52, 0.08);
+      backdrop-filter: blur(18px);
+    }
+
+    .overview-card {
+      padding: 18px 18px 16px;
+      min-height: 136px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .overview-card .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .overview-card .value {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+    }
+
+    .overview-card .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(330px, 0.95fr);
+      gap: 18px;
+    }
+
+    .panel {
+      padding: 18px 18px 16px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .panel-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .stage-timeline {
+      display: grid;
+      gap: 14px;
+    }
+
+    .stage-card {
+      padding: 16px;
+      border-radius: 18px;
+      background: var(--surface-strong);
+      border: 1px solid var(--line);
+      transition: transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .stage-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 28px rgba(23, 54, 52, 0.08);
+    }
+
+    .stage-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .stage-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .stage-index {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .stage-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stage-metric {
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: var(--surface-soft);
+      min-height: 72px;
+    }
+
+    .stage-metric-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .stage-metric-value {
+      font-size: 14px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .business-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .business-stat {
+      padding: 14px;
+      border-radius: 16px;
+      background: var(--surface-soft);
+      border: 1px solid rgba(26, 79, 73, 0.08);
+    }
+
+    .business-stat strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+    }
+
+    .milestone-strip {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .milestone-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      align-items: center;
+    }
+
+    .milestone-row small {
+      color: var(--muted);
+      display: block;
+      margin-top: 4px;
+    }
+
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .report-card {
+      padding: 14px;
+      border-radius: 16px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 130px;
+    }
+
+    .report-kind {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .report-path {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      word-break: break-all;
+    }
+
+    .governance-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+      gap: 18px;
+    }
+
+    .artifact-tree {
+      display: grid;
+      gap: 10px;
+    }
+
+    .artifact-node {
+      padding: 14px;
+      border-radius: 16px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+    }
+
+    .artifact-children {
+      margin-top: 10px;
+      margin-left: 18px;
+      display: grid;
+      gap: 8px;
+      border-left: 2px solid rgba(15, 138, 109, 0.14);
+      padding-left: 12px;
+    }
+
+    .gate-tags,
+    .metric-tags,
+    .log-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .metric-chip,
+    .gate-chip,
+    .log-chip {
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: var(--surface-soft);
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .event-list,
+    .detector-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .event-item,
+    .detector-item {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+    }
+
+    .empty-state {
+      padding: 26px 20px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px dashed rgba(26, 79, 73, 0.18);
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: rgba(15, 138, 109, 0.12);
+      color: var(--accent);
+    }
+
+    .text-danger { color: var(--danger); }
+    .text-warning { color: var(--warning); }
+    .text-muted { color: var(--muted); }
+
+    @media (max-width: 1120px) {
+      .hero-grid,
+      .section-grid,
+      .governance-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .overview-grid,
+      .business-grid,
+      .report-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page-shell { padding: 18px 14px 28px; }
+      .hero { padding: 22px 18px 20px; border-radius: 24px; }
+      .hero-meta,
+      .overview-grid,
+      .business-grid,
+      .report-grid,
+      .stage-meta {
+        grid-template-columns: 1fr;
+      }
+      .dashboard-tabs { padding: 10px 10px 0; }
+      .panel, .overview-card { border-radius: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="page-shell"></div>
+
+  <script src="/static/vendor/vue.global.prod.js"></script>
+  <script src="/static/vendor/element-plus/index.full.min.js"></script>
+  <script>
+    const { createApp, ref, computed, onMounted, onBeforeUnmount } = Vue
+    const {
+      ElTabs, ElTabPane, ElButton, ElTag, ElProgress, ElDescriptions, ElDescriptionsItem,
+      ElCollapse, ElCollapseItem, ElAlert, ElSkeleton, ElDivider, ElEmpty
+    } = ElementPlus
+
+    function statusType(status) {
+      const map = {
+        completed: 'success',
+        running: 'warning',
+        failed: 'danger',
+        pending: 'info',
+        idle: 'info'
+      }
+      return map[String(status || '').toLowerCase()] || 'info'
+    }
+
+    function percentText(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return 'N/A'
+      return (Number(value) * 100).toFixed(2) + '%'
+    }
+
+    function numberText(value, suffix = '') {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return 'N/A'
+      return Number(value).toFixed(Number.isInteger(Number(value)) ? 0 : 2) + suffix
+    }
+
+    function dateText(value) {
+      if (!value) return 'N/A'
+      const date = new Date(value)
+      return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-CN')
+    }
+
+    function flattenArtifacts(nodes, level = 0) {
+      if (!Array.isArray(nodes)) return []
+      return nodes.flatMap(node => [{ ...node, level }, ...flattenArtifacts(node.children || [], level + 1)])
+    }
+
+    createApp({
+      components: {
+        ElTabs, ElTabPane, ElButton, ElTag, ElProgress, ElDescriptions, ElDescriptionsItem,
+        ElCollapse, ElCollapseItem, ElAlert, ElSkeleton, ElDivider, ElEmpty
+      },
+      setup() {
+        const loading = ref(true)
+        const error = ref('')
+        const activeTab = ref('medical')
+        const state = ref(null)
+        let timer = null
+
+        const medical = computed(() => state.value?.medicalWorkflow || null)
+        const liveStatus = computed(() => medical.value?.liveStatus || null)
+        const stages = computed(() => {
+          const stageMap = liveStatus.value?.stages || {}
+          return Object.entries(stageMap).map(([key, value], index) => ({ key, index: index + 1, ...value }))
+        })
+        const reports = computed(() => medical.value?.reports || [])
+        const business = computed(() => medical.value?.business || null)
+        const governanceArtifacts = computed(() => state.value?.artifacts || [])
+        const recentEvents = computed(() => state.value?.recentEvents || [])
+        const detectorStats = computed(() => state.value?.detectorStats || [])
+
+        const stageCollapse = computed(() => stages.value.map(stage => stage.key))
+
+        async function loadState() {
+          try {
+            const response = await fetch('/api/state', { cache: 'no-store' })
+            if (!response.ok) throw new Error('Dashboard API failed with ' + response.status)
+            state.value = await response.json()
+            error.value = ''
+          } catch (err) {
+            error.value = err instanceof Error ? err.message : String(err)
+          } finally {
+            loading.value = false
+          }
+        }
+
+        function startAutoRefresh() {
+          timer = window.setInterval(loadState, 5000)
+        }
+
+        function stopAutoRefresh() {
+          if (timer) {
+            window.clearInterval(timer)
+            timer = null
+          }
+        }
+
+        onMounted(async () => {
+          await loadState()
+          startAutoRefresh()
+        })
+
+        onBeforeUnmount(() => stopAutoRefresh())
+
+        return {
+          loading,
+          error,
+          activeTab,
+          state,
+          medical,
+          liveStatus,
+          stages,
+          reports,
+          business,
+          governanceArtifacts,
+          recentEvents,
+          detectorStats,
+          stageCollapse,
+          loadState,
+          statusType,
+          percentText,
+          numberText,
+          dateText,
+          flattenArtifacts,
+        }
+      },
+      template: `
+        <div>
+          <section class="hero">
+            <div class="hero-grid">
+              <div>
+                <div class="eyebrow">SCALE Engine / Medical Research Workflow</div>
+                <h1>SCALE Engine 工程治理后台。</h1>
+                <p>
+                  这里用于查看工程治理、Artifact、事件和 Agent 运行信号；面向医学研究者的正式交付入口是医学研究工作台。
+                </p>
+                <el-button
+                  type="success"
+                  tag="a"
+                  href="http://127.0.0.1:18766/"
+                  target="_blank"
+                  style="margin-bottom:18px;"
+                >
+                  打开医学研究工作台
+                </el-button>
+                <div class="hero-meta">
+                  <div class="meta-card">
+                    <div class="meta-label">Current Target</div>
+                    <div class="meta-value">{{ liveStatus?.target || 'N/A' }}</div>
+                  </div>
+                  <div class="meta-card">
+                    <div class="meta-label">Disease Focus</div>
+                    <div class="meta-value">{{ liveStatus?.disease || 'N/A' }}</div>
+                  </div>
+                  <div class="meta-card">
+                    <div class="meta-label">Last Sync</div>
+                    <div class="meta-value" style="font-size:15px;">{{ dateText(medical?.latestUpdatedAt) }}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="hero-side">
+                <div class="hero-side-panel">
+                  <div>
+                    <small>Run Status</small>
+                    <strong>{{ liveStatus?.status || 'idle' }}</strong>
+                  </div>
+                  <el-progress
+                    :percentage="Math.max(0, Math.min(100, liveStatus?.progress_percent || 0))"
+                    :stroke-width="12"
+                    status="success"
+                    striped
+                    striped-flow
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="dashboard-tabs">
+            <div class="toolbar">
+              <el-button type="success" plain @click="loadState">立即刷新</el-button>
+              <span class="status-pill">
+                {{ liveStatus?.current_stage_label || 'No active stage' }}
+              </span>
+            </div>
+
+            <el-tabs v-model="activeTab" stretch>
+              <el-tab-pane label="Medical Workflow" name="medical" />
+              <el-tab-pane label="Governance" name="governance" />
+            </el-tabs>
+          </section>
+
+          <div class="dashboard-content">
+            <el-alert
+              v-if="error"
+              type="error"
+              :closable="false"
+              show-icon
+              :title="'Dashboard 加载失败：' + error"
+            />
+
+            <template v-if="loading">
+              <el-skeleton :rows="10" animated />
+            </template>
+
+            <template v-else-if="activeTab === 'medical'">
+              <div v-if="medical?.errors?.length">
+                <el-alert
+                  v-for="item in medical.errors"
+                  :key="item"
+                  type="warning"
+                  :closable="false"
+                  show-icon
+                  :title="item"
+                  style="margin-bottom: 12px;"
+                />
+              </div>
+
+              <div class="overview-grid">
+                <div class="overview-card">
+                  <div class="label">Pipeline Progress</div>
+                  <div class="value">{{ numberText(liveStatus?.progress_percent || 0, '%') }}</div>
+                  <div class="hint">{{ liveStatus?.current_stage_label || 'Waiting for next run' }}</div>
+                </div>
+                <div class="overview-card">
+                  <div class="label">Dynamic Success Rate</div>
+                  <div class="value">{{ percentText(business?.overallSuccessRate) }}</div>
+                  <div class="hint">来自 Stage 1-4 联动调整后的总体成功率</div>
+                </div>
+                <div class="overview-card">
+                  <div class="label">Program Cost</div>
+                  <div class="value">{{ numberText(business?.totalCostEstimate, 'M') }}</div>
+                  <div class="hint">总成本估算，单位为百万级预算</div>
+                </div>
+                <div class="overview-card">
+                  <div class="label">Completion Horizon</div>
+                  <div class="value" style="font-size: 22px;">{{ business?.estimatedCompletion || 'N/A' }}</div>
+                  <div class="hint">{{ numberText(business?.totalDurationMonths, ' months') }}</div>
+                </div>
+              </div>
+
+              <div class="section-grid">
+                <div class="panel">
+                  <div class="panel-header">
+                    <div>
+                      <h2 class="panel-title">Stage 1-4 Live Timeline</h2>
+                      <div class="panel-subtitle">实时阶段状态、关键指标、日志与失败信号集中在这里。</div>
+                    </div>
+                    <el-tag :type="statusType(liveStatus?.status)" effect="dark">{{ liveStatus?.status || 'idle' }}</el-tag>
+                  </div>
+
+                  <div v-if="!stages.length" class="empty-state">
+                    当前还没有可展示的阶段运行记录。
+                  </div>
+
+                  <el-collapse v-else :model-value="stageCollapse">
+                    <el-collapse-item
+                      v-for="stage in stages"
+                      :key="stage.key"
+                      :name="stage.key"
+                    >
+                      <template #title>
+                        <div class="stage-title" style="width:100%;">
+                          <span class="stage-index">S{{ stage.index }}</span>
+                          <span>{{ stage.label }}</span>
+                          <span style="flex:1;"></span>
+                          <el-tag :type="statusType(stage.status)">{{ stage.status }}</el-tag>
+                        </div>
+                      </template>
+
+                      <div class="stage-card">
+                        <div class="stage-topline">
+                          <div class="panel-subtitle">
+                            Started {{ dateText(stage.startedAt) }} · Finished {{ dateText(stage.finishedAt) }}
+                          </div>
+                          <div v-if="stage.error" class="text-danger">{{ stage.error }}</div>
+                        </div>
+                        <div class="stage-meta">
+                          <div
+                            v-for="(metricValue, metricKey) in stage.metrics"
+                            :key="metricKey"
+                            class="stage-metric"
+                          >
+                            <div class="stage-metric-label">{{ metricKey }}</div>
+                            <div class="stage-metric-value">{{ Array.isArray(metricValue) ? metricValue.join(', ') : metricValue }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </el-collapse-item>
+                  </el-collapse>
+
+                  <el-divider />
+
+                  <div>
+                    <div class="panel-header" style="margin-bottom: 10px;">
+                      <div>
+                        <h3 class="panel-title" style="font-size:16px;">Runtime Log Stream</h3>
+                        <div class="panel-subtitle">最近 200 条流水日志中的最新片段。</div>
+                      </div>
+                    </div>
+                    <div v-if="!liveStatus?.logs?.length" class="empty-state">
+                      暂无运行日志。
+                    </div>
+                    <div v-else class="log-list">
+                      <span
+                        v-for="log in liveStatus.logs.slice(-10).reverse()"
+                        :key="log.timestamp + '-' + log.message"
+                        class="log-chip"
+                      >
+                        {{ dateText(log.timestamp) }} · {{ log.level }} · {{ log.message }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:grid; gap:18px;">
+                  <div class="panel">
+                    <div class="panel-header">
+                      <div>
+                        <h2 class="panel-title">Business Readout</h2>
+                        <div class="panel-subtitle">Stage 4 动态成功率、成本、里程碑与数据源。</div>
+                      </div>
+                    </div>
+
+                    <div v-if="!business" class="empty-state">
+                      Stage 4 结果还没有进入根 dashboard。
+                    </div>
+                    <template v-else>
+                      <div class="business-grid">
+                        <div class="business-stat">
+                          <span class="panel-subtitle">Success Rate</span>
+                          <strong>{{ percentText(business.overallSuccessRate) }}</strong>
+                        </div>
+                        <div class="business-stat">
+                          <span class="panel-subtitle">Total Cost</span>
+                          <strong>{{ numberText(business.totalCostEstimate, 'M') }}</strong>
+                        </div>
+                        <div class="business-stat">
+                          <span class="panel-subtitle">Duration</span>
+                          <strong>{{ numberText(business.totalDurationMonths, ' m') }}</strong>
+                        </div>
+                        <div class="business-stat">
+                          <span class="panel-subtitle">Completion</span>
+                          <strong style="font-size:18px;">{{ business.estimatedCompletion || 'N/A' }}</strong>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div class="panel-subtitle" style="margin-bottom:8px;">Adjustment Data Sources</div>
+                        <div v-if="business.dataSources.length" class="metric-tags">
+                          <span v-for="item in business.dataSources" :key="item" class="metric-chip">{{ item }}</span>
+                        </div>
+                        <div v-else class="text-muted">暂无动态调整来源数据。</div>
+                      </div>
+
+                      <div style="margin-top:14px;">
+                        <div class="panel-subtitle" style="margin-bottom:8px;">Adjustment Details</div>
+                        <div v-if="Object.keys(business.adjustmentDetails || {}).length" class="metric-tags">
+                          <span
+                            v-for="(detailValue, detailKey) in business.adjustmentDetails"
+                            :key="detailKey"
+                            class="metric-chip"
+                          >
+                            {{ detailKey }}: {{ typeof detailValue === 'object' ? JSON.stringify(detailValue) : detailValue }}
+                          </span>
+                        </div>
+                        <div v-else class="text-muted">暂无更细粒度的调整明细。</div>
+                      </div>
+
+                      <div class="milestone-strip" v-if="business.milestones.length">
+                        <div class="panel-subtitle">Top Milestones</div>
+                        <div
+                          v-for="milestone in business.milestones.slice(0, 6)"
+                          :key="milestone.phase"
+                          class="milestone-row"
+                        >
+                          <div>
+                            <strong>{{ milestone.phaseName }}</strong>
+                            <small>{{ milestone.endDate || 'No end date' }}</small>
+                          </div>
+                          <el-tag type="success">{{ percentText(milestone.successRate) }}</el-tag>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <div class="panel">
+                    <div class="panel-header">
+                      <div>
+                        <h2 class="panel-title">Reports & Artifacts</h2>
+                        <div class="panel-subtitle">研究报告、JSON、里程碑文件和 HTML/PDF 直达入口。</div>
+                      </div>
+                    </div>
+
+                    <div v-if="!reports.length" class="empty-state">
+                      当前还没有可打开的产物文件。
+                    </div>
+                    <div v-else class="report-grid">
+                      <div v-for="report in reports.slice(0, 10)" :key="report.path" class="report-card">
+                        <span class="report-kind">{{ report.kind }}</span>
+                        <strong>{{ report.label }}</strong>
+                        <div class="report-path">{{ report.relativePath }}</div>
+                        <div style="margin-top:auto;">
+                          <el-button type="primary" plain size="small" :href="report.url" target="_blank">打开</el-button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="overview-grid">
+                <div class="overview-card">
+                  <div class="label">Artifacts</div>
+                  <div class="value">{{ flattenArtifacts(governanceArtifacts).length }}</div>
+                  <div class="hint">根仓库治理对象总量</div>
+                </div>
+                <div class="overview-card">
+                  <div class="label">Detectors</div>
+                  <div class="value">{{ detectorStats.length }}</div>
+                  <div class="hint">当前 guardrail 统计源</div>
+                </div>
+                <div class="overview-card">
+                  <div class="label">Recent Events</div>
+                  <div class="value">{{ recentEvents.length }}</div>
+                  <div class="hint">最新事件总数（当前快照）</div>
+                </div>
+                <div class="overview-card">
+                  <div class="label">Evolution Score</div>
+                  <div class="value">{{ state?.evolutionMetrics?.overallScore?.toFixed ? state.evolutionMetrics.overallScore.toFixed(1) : 'N/A' }}</div>
+                  <div class="hint">沿用现有 SCALE Engine 进化评估</div>
+                </div>
+              </div>
+
+              <div class="governance-grid">
+                <div class="panel">
+                  <div class="panel-header">
+                    <div>
+                      <h2 class="panel-title">Artifact Tree</h2>
+                      <div class="panel-subtitle">保留根仓库已有治理视角，不和医学工作流割裂。</div>
+                    </div>
+                  </div>
+
+                  <div v-if="!governanceArtifacts.length" class="empty-state">
+                    当前没有 artifact 树数据。
+                  </div>
+
+                  <div v-else class="artifact-tree">
+                    <template v-for="artifact in governanceArtifacts" :key="artifact.id">
+                      <div class="artifact-node">
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                          <strong>{{ artifact.id }}</strong>
+                          <span>{{ artifact.title }}</span>
+                          <el-tag :type="statusType(artifact.status)">{{ artifact.status }}</el-tag>
+                        </div>
+                        <div v-if="artifact.gates?.length" class="gate-tags" style="margin-top:10px;">
+                          <span v-for="gate in artifact.gates" :key="gate.name" class="gate-chip">
+                            {{ gate.passed ? 'PASS' : 'FAIL' }} · {{ gate.name }}
+                          </span>
+                        </div>
+                        <div v-if="artifact.children?.length" class="artifact-children">
+                          <div v-for="child in artifact.children" :key="child.id" class="artifact-node">
+                            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                              <strong>{{ child.id }}</strong>
+                              <span>{{ child.title }}</span>
+                              <el-tag :type="statusType(child.status)">{{ child.status }}</el-tag>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <div style="display:grid; gap:18px;">
+                  <div class="panel">
+                    <div class="panel-header">
+                      <div>
+                        <h2 class="panel-title">Detector Stats</h2>
+                        <div class="panel-subtitle">现有 guardrail 触发统计。</div>
+                      </div>
+                    </div>
+
+                    <div v-if="!detectorStats.length" class="empty-state">
+                      当前没有 detector 数据。
+                    </div>
+                    <div v-else class="detector-list">
+                      <div v-for="item in detectorStats" :key="item.name" class="detector-item">
+                        <strong>{{ item.name }}</strong>
+                        <div class="panel-subtitle">Total triggers: {{ item.totalTriggers }}</div>
+                        <div class="metric-tags" style="margin-top:8px;">
+                          <span
+                            v-for="(count, severity) in item.bySeverity"
+                            :key="severity"
+                            class="metric-chip"
+                          >
+                            {{ severity }}: {{ count }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="panel">
+                    <div class="panel-header">
+                      <div>
+                        <h2 class="panel-title">Recent Events</h2>
+                        <div class="panel-subtitle">SCALE Engine 最近事件流。</div>
+                      </div>
+                    </div>
+
+                    <div v-if="!recentEvents.length" class="empty-state">
+                      当前没有 recent events。
+                    </div>
+                    <div v-else class="event-list">
+                      <div v-for="event in recentEvents.slice(0, 12)" :key="event.timestamp + '-' + event.type" class="event-item">
+                        <strong>{{ event.type }}</strong>
+                        <div class="panel-subtitle">{{ dateText(event.timestamp) }}</div>
+                        <div v-if="event.artifactId" class="text-muted" style="margin-top:4px;">Artifact: {{ event.artifactId }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      `
+    }).use(ElementPlus).mount('#app')
+  </script>
+</body>
+</html>

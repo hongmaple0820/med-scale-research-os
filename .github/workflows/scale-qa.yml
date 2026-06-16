@@ -1,0 +1,39 @@
+name: SCALE QA Check
+
+on:
+  deployment_status:
+    states: [success]
+
+jobs:
+  scale-browser-qa:
+    if: github.event.deployment_status.environment == 'preview' || github.event.deployment_status.environment == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install SCALE Engine
+        run: npm install -g @hongmaple0820/scale-engine
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Browser QA
+        run: |
+          DEPLOY_URL="${{ github.event.deployment_status.target_url }}"
+          scale qa e2e --url "$DEPLOY_URL" --json 2>&1 | tee scale-qa.json
+
+      - name: Upload QA Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scale-qa-evidence
+          path: |
+            .scale/qa/screenshots/
+            scale-qa.json
+          retention-days: 30

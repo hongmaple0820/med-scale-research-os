@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>靶点研究平台 — 医学研究工作台</title>
+  <style>
+    :root {
+      --bg: #f3efe7;
+      --panel: rgba(255,252,245,0.88);
+      --ink: #1e2430;
+      --muted: #6d7485;
+      --line: rgba(30,36,48,0.12);
+      --accent: #0f766e;
+      --accent-2: #d97706;
+      --ok: #15803d;
+      --warn: #b45309;
+      --fail: #b91c1c;
+      --pending: #94a3b8;
+      --running: #2563eb;
+      --shadow: 0 16px 50px rgba(34,45,72,0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--ink);
+      background: radial-gradient(circle at top left, rgba(15,118,110,0.15), transparent 28%),
+        radial-gradient(circle at top right, rgba(217,119,6,0.12), transparent 24%),
+        linear-gradient(180deg, #faf7f0 0%, var(--bg) 100%);
+      font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      min-height: 100vh;
+    }
+    .shell { max-width: 1440px; margin: 0 auto; padding: 28px 22px 44px; }
+    .hero { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 22px; margin-bottom: 22px; }
+    .panel {
+      background: var(--panel); border: 1px solid rgba(255,255,255,0.6);
+      border-radius: 24px; box-shadow: var(--shadow); backdrop-filter: blur(14px);
+    }
+    .hero-card { padding: 28px; position: relative; overflow: hidden; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 10px; padding: 8px 12px;
+      border-radius: 999px; font-size: 12px; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--accent); background: rgba(15,118,110,0.09);
+      margin-bottom: 14px;
+    }
+    h1 { margin: 0 0 14px; font-size: clamp(30px,4vw,54px); line-height: 0.96; letter-spacing: -0.04em; }
+    .hero-copy { max-width: 700px; color: var(--muted); font-size: 16px; line-height: 1.7; margin-bottom: 22px; }
+    .status-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .status-pill {
+      padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+      background: rgba(37,99,235,0.1); color: var(--running);
+    }
+    .status-pill.completed { color: var(--ok); background: rgba(21,128,61,0.1); }
+    .status-pill.failed { color: var(--fail); background: rgba(185,28,28,0.1); }
+    .status-pill.idle { color: var(--muted); background: rgba(109,116,133,0.12); }
+    .hero-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 18px; font-size: 14px; color: var(--muted); }
+    .hero-metrics { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; padding: 28px; }
+    .metric { padding: 18px; border-radius: 18px; background: rgba(255,255,255,0.62); border: 1px solid rgba(30,36,48,0.06); }
+    .metric-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+    .metric-value { font-size: 28px; font-weight: 700; letter-spacing: -0.04em; }
+    .grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 22px; }
+    .section { padding: 24px; }
+    .section h2 { margin: 0 0 16px; font-size: 18px; letter-spacing: -0.02em; }
+    .workflow { display: grid; gap: 14px; }
+    .stage-card {
+      padding: 18px; border-radius: 18px; border: 1px solid var(--line);
+      background: rgba(255,255,255,0.6); transition: transform 220ms, border-color 220ms, background 220ms;
+    }
+    .stage-card.running { border-color: rgba(37,99,235,0.35); background: rgba(37,99,235,0.06); transform: translateX(4px); }
+    .stage-card.completed { border-color: rgba(21,128,61,0.3); background: rgba(21,128,61,0.06); }
+    .stage-card.failed { border-color: rgba(185,28,28,0.35); background: rgba(185,28,28,0.06); }
+    .stage-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .stage-name { font-size: 16px; font-weight: 700; }
+    .stage-status { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .stage-metrics { display: flex; flex-wrap: wrap; gap: 8px; }
+    .stage-metric { padding: 7px 10px; border-radius: 999px; background: rgba(30,36,48,0.06); font-size: 12px; color: var(--ink); }
+    .progress-track { width: 100%; height: 12px; border-radius: 999px; background: rgba(30,36,48,0.08); overflow: hidden; margin-top: 14px; }
+    .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius: inherit; transition: width 320ms; }
+    .run-form { display: grid; gap: 12px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; }
+    label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+    input, select, button { font: inherit; }
+    input, select {
+      border: 1px solid var(--line); background: rgba(255,255,255,0.85);
+      border-radius: 14px; padding: 12px 14px; color: var(--ink); outline: none;
+    }
+    input:focus, select:focus { border-color: rgba(37,99,235,0.35); box-shadow: 0 0 0 4px rgba(37,99,235,0.08); }
+    button { border: none; border-radius: 14px; padding: 13px 16px; font-weight: 700; cursor: pointer; transition: transform 180ms, opacity 180ms; }
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+    .primary { background: linear-gradient(135deg,#0f766e,#2563eb); color: white; }
+    .log-view {
+      min-height: 320px; max-height: 520px; overflow: auto; padding: 16px;
+      border-radius: 18px; background: #141924; color: #d9e0f0;
+      font-family: Consolas,"SFMono-Regular",monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap;
+    }
+    .artifact-list { display: grid; gap: 10px; }
+    .artifact-item {
+      padding: 12px 14px; border-radius: 16px; background: rgba(255,255,255,0.66);
+      border: 1px solid var(--line); font-size: 13px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .artifact-path { margin-top: 4px; color: var(--muted); word-break: break-all; }
+    .artifact-dl {
+      padding: 6px 12px; border-radius: 10px; background: var(--accent); color: white;
+      font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none; border: none;
+    }
+    .artifact-dl:hover { opacity: 0.85; }
+    .mini-note { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .tab-bar { display: flex; gap: 0; margin-bottom: 0; }
+    .tab-btn {
+      padding: 10px 20px; border: none; background: rgba(255,255,255,0.4);
+      color: var(--muted); font-weight: 600; font-size: 13px; cursor: pointer;
+      border-bottom: 3px solid transparent; transition: all 200ms;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(255,255,255,0.8); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .chart-container { position: relative; width: 100%; height: 320px; }
+    .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .file-card {
+      padding: 16px; border-radius: 14px; background: rgba(255,255,255,0.7);
+      border: 1px solid var(--line); transition: transform 150ms, box-shadow 150ms;
+      display: flex; flex-direction: column; gap: 10px; min-height: 180px;
+    }
+    .file-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+    .file-title { font-size: 15px; font-weight: 700; line-height: 1.4; }
+    .file-desc { font-size: 12px; color: var(--muted); line-height: 1.6; flex: 1; }
+    .file-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-secondary {
+      background: rgba(30,36,48,0.06); color: var(--ink); padding: 8px 12px;
+      border-radius: 10px; font-size: 12px; font-weight: 600;
+    }
+    .btn-download {
+      background: var(--accent); color: white; padding: 8px 12px;
+      border-radius: 10px; font-size: 12px; font-weight: 600; text-decoration: none;
+    }
+    .section-note { font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; }
+    .advanced-toggle {
+      margin-top: 18px; font-size: 13px; color: var(--accent); cursor: pointer; font-weight: 600;
+    }
+    .advanced-grid { display: none; margin-top: 12px; }
+    .advanced-grid.open { display: grid; }
+    .compare-summary {
+      padding: 16px 18px; border-radius: 16px; background: rgba(15,118,110,0.08);
+      border: 1px solid rgba(15,118,110,0.18); margin-bottom: 18px; line-height: 1.7; font-size: 14px;
+    }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(20,25,36,0.55); display: none;
+      align-items: center; justify-content: center; z-index: 1000; padding: 24px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-panel {
+      width: min(960px, 100%); max-height: 85vh; overflow: auto; background: white;
+      border-radius: 20px; padding: 22px; box-shadow: var(--shadow);
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .modal-title { font-size: 18px; font-weight: 700; }
+    .modal-close { background: rgba(30,36,48,0.08); color: var(--ink); padding: 8px 12px; border-radius: 10px; }
+    .preview-frame { width: 100%; min-height: 420px; border: 1px solid var(--line); border-radius: 12px; }
+    .preview-image-shell { display: flex; justify-content: center; align-items: flex-start; padding: 8px; background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; }
+    .preview-image { display: block; max-width: 100%; height: auto; border-radius: 10px; }
+    .preview-text { white-space: pre-wrap; font-size: 13px; line-height: 1.8; }
+    .file-icon { font-size: 24px; margin-bottom: 6px; }
+    .file-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; word-break: break-all; }
+    .file-meta { font-size: 11px; color: var(--muted); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+    .badge-json { background: #e6f1fb; color: #185fa5; }
+    .badge-md { background: #eaf3de; color: #3b6d11; }
+    .badge-html { background: #faecda; color: #854f0b; }
+    .badge-pdf { background: #fceebe; color: #b45309; }
+    .badge-docx { background: #e1f5ee; color: #0f6e56; }
+    .report-view {
+      padding: 24px; border-radius: 18px; background: rgba(255,255,255,0.9);
+      border: 1px solid var(--line); max-height: 600px; overflow: auto;
+      font-size: 14px; line-height: 1.8;
+    }
+    .report-view h1 { font-size: 22px; margin-bottom: 8px; }
+    .report-view h2 { font-size: 18px; margin: 16px 0 8px; color: var(--accent); }
+    .report-view h3 { font-size: 15px; margin: 12px 0 6px; }
+    .report-view table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    .report-view th, .report-view td { border: 1px solid var(--line); padding: 8px 12px; font-size: 13px; text-align: left; }
+    .report-view th { background: rgba(15,118,110,0.08); font-weight: 600; }
+    .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .report-layout { display: grid; grid-template-columns: 220px 1fr; gap: 18px; }
+    .report-nav { display: grid; gap: 8px; align-content: start; }
+    .report-nav-btn {
+      text-align: left; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line);
+      background: rgba(255,255,255,0.7); color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .report-nav-btn small { display: block; margin-top: 4px; font-weight: 400; color: var(--muted); font-size: 11px; line-height: 1.4; }
+    .report-nav-btn.active { border-color: rgba(15,118,110,0.35); background: rgba(15,118,110,0.08); color: var(--accent); }
+    .report-nav-btn.missing { opacity: 0.45; cursor: not-allowed; }
+    .summary-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .summary-card { padding: 12px 14px; border-radius: 14px; background: rgba(15,118,110,0.06); border: 1px solid rgba(15,118,110,0.12); }
+    .summary-card .label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .summary-card .value { font-size: 16px; font-weight: 700; }
+    .info-banner {
+      padding: 12px 14px; border-radius: 14px; background: rgba(217,119,6,0.08);
+      border: 1px solid rgba(217,119,6,0.18); font-size: 13px; line-height: 1.7; margin-bottom: 16px; color: var(--ink);
+    }
+    .readiness-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+    .readiness-card {
+      padding: 16px; border-radius: 14px; border: 1px solid var(--line);
+      background: rgba(255,255,255,0.72); min-height: 184px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .readiness-card h3 { margin: 0; font-size: 14px; }
+    .readiness-card .value { font-size: 20px; font-weight: 800; letter-spacing: 0; }
+    .readiness-card ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .readiness-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .readiness-status {
+      flex: 0 0 auto; max-width: 120px; padding: 4px 8px; border-radius: 999px;
+      background: rgba(30,36,48,0.07); color: var(--muted);
+      font-size: 11px; font-weight: 700; line-height: 1.3; text-align: center;
+    }
+    .readiness-action {
+      margin-top: auto; padding-top: 8px; border-top: 1px solid rgba(30,36,48,0.08);
+      color: var(--ink); font-size: 12px; line-height: 1.5; font-weight: 600;
+    }
+    .memory-review-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+    .memory-review-actions .btn-secondary { padding: 6px 9px; border-radius: 8px; }
+    .memory-review-actions .btn-secondary.pass { background: rgba(21,128,61,0.1); color: var(--ok); }
+    .memory-review-actions .btn-secondary.warning { background: rgba(217,119,6,0.12); color: var(--warn); }
+    .memory-review-actions .btn-secondary.fail { background: rgba(185,28,28,0.1); color: var(--fail); }
+    .readiness-card.warning { border-color: rgba(217,119,6,0.32); background: rgba(217,119,6,0.07); }
+    .readiness-card.pass { border-color: rgba(21,128,61,0.24); background: rgba(21,128,61,0.06); }
+    .readiness-card.fail { border-color: rgba(185,28,28,0.32); background: rgba(185,28,28,0.07); }
+    .readiness-card.pending { border-color: rgba(148,163,184,0.34); background: rgba(148,163,184,0.08); }
+    .readiness-card.pass .readiness-status { background: rgba(21,128,61,0.1); color: var(--ok); }
+    .readiness-card.warning .readiness-status { background: rgba(217,119,6,0.12); color: var(--warn); }
+    .readiness-card.fail .readiness-status { background: rgba(185,28,28,0.1); color: var(--fail); }
+    .os-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+    .os-title-group h2 { margin-bottom: 6px; }
+    .os-score {
+      min-width: 132px; padding: 12px 14px; border-radius: 14px;
+      background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.16);
+      text-align: right;
+    }
+    .os-score .label { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .os-score .value { font-size: 26px; line-height: 1; font-weight: 800; }
+    .os-layout { display: grid; grid-template-columns: 0.95fr 1.05fr; gap: 12px; }
+    .os-card {
+      padding: 16px; border-radius: 14px; background: rgba(255,255,255,0.72);
+      border: 1px solid var(--line); min-height: 160px;
+    }
+    .os-card h3 { margin: 0 0 10px; font-size: 14px; }
+    .os-card.wide { grid-column: 1 / -1; }
+    .os-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .os-chip {
+      display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 999px;
+      background: rgba(30,36,48,0.07); color: var(--ink); font-size: 12px; font-weight: 700;
+    }
+    .os-chip.pass { background: rgba(21,128,61,0.1); color: var(--ok); }
+    .os-chip.warning { background: rgba(217,119,6,0.12); color: var(--warn); }
+    .os-chip.fail { background: rgba(185,28,28,0.1); color: var(--fail); }
+    .os-chip.pending { background: rgba(148,163,184,0.16); color: #475569; }
+    .os-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .os-list li {
+      display: grid; gap: 3px; padding: 9px 10px; border-radius: 10px;
+      background: rgba(30,36,48,0.045); font-size: 12px; line-height: 1.45;
+    }
+    .os-list strong { font-size: 13px; }
+    .os-list small { color: var(--muted); line-height: 1.45; }
+    .os-template-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+    .os-template {
+      display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px;
+      background: rgba(30,36,48,0.045); border: 1px solid rgba(30,36,48,0.06);
+    }
+    .os-template strong { font-size: 13px; }
+    .json-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .json-summary-item { padding: 10px 12px; border-radius: 12px; background: rgba(37,99,235,0.06); border: 1px solid rgba(37,99,235,0.12); }
+    .json-summary-item .label { font-size: 11px; color: var(--muted); }
+    .json-summary-item .value { font-size: 14px; font-weight: 700; margin-top: 4px; word-break: break-word; }
+    .raw-toggle { font-size: 12px; color: var(--accent); cursor: pointer; font-weight: 600; margin: 8px 0; }
+    .raw-json { display: none; max-height: 360px; overflow: auto; background: #141924; color: #d9e0f0; padding: 14px; border-radius: 12px; font-size: 12px; }
+    .raw-json.open { display: block; }
+    .report-view code { background: rgba(30,36,48,0.06); padding: 2px 6px; border-radius: 6px; font-size: 12px; }
+    .report-view pre { background: #141924; color: #d9e0f0; padding: 14px; border-radius: 12px; overflow: auto; }
+    .report-view blockquote { margin: 12px 0; padding: 10px 14px; border-left: 4px solid var(--accent); background: rgba(15,118,110,0.06); color: var(--muted); }
+    @media (max-width: 1080px) { .hero, .grid, .report-layout, .readiness-grid, .os-layout { grid-template-columns: 1fr; } .form-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 680px) { .os-header { flex-direction: column; } .os-score { width: 100%; text-align: left; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="panel hero-card">
+        <div class="eyebrow">医学研究工作台</div>
+        <h1>靶点研究平台<br>研究者交付工作台</h1>
+        <div class="hero-copy">
+          输入靶点与疾病后，查看四阶段分析、期刊论文草稿、事实核查、质量门禁和交付 ZIP。所有医学结论均需专家审阅，不能直接投稿。
+        </div>
+        <div class="status-row">
+          <div id="runStatusPill" class="status-pill idle">Idle</div>
+          <div id="currentStageText" class="status-pill idle">等待启动</div>
+        </div>
+        <div class="hero-meta">
+          <div><strong>Target:</strong> <span id="metaTarget">-</span></div>
+          <div><strong>Disease:</strong> <span id="metaDisease">-</span></div>
+          <div><strong>Run ID:</strong> <span id="metaRunId">-</span></div>
+          <div><strong>Updated:</strong> <span id="metaUpdated">-</span></div>
+        </div>
+        <div class="progress-track">
+          <div id="globalProgressFill" class="progress-fill"></div>
+        </div>
+      </div>
+      <aside class="panel hero-metrics">
+        <div class="metric">
+          <div class="metric-label">全局进度</div>
+          <div id="metricProgress" class="metric-value">0%</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">完成阶段</div>
+          <div id="metricCompleted" class="metric-value">0 / 4</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">研发成功率</div>
+          <div id="metricSuccessRate" class="metric-value">-</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">临床试验</div>
+          <div id="metricTrials" class="metric-value">-</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">论文质量</div>
+          <div id="metricManuscriptQuality" class="metric-value">-</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">事实核查</div>
+          <div id="metricFactCheck" class="metric-value">-</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Delivery ZIP</div>
+          <div id="metricDeliveryPackage" class="metric-value">-</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel" style="margin-bottom: 22px;">
+      <div class="section">
+        <div class="os-header">
+          <div class="os-title-group">
+            <h2 id="medOsTitle">MedSCALE Research OS</h2>
+            <div id="medOsTagline" class="section-note">医学研究 Agent 协作、证据门禁、记忆沉淀和交付审计的研究者视图。</div>
+          </div>
+          <div class="os-score">
+            <div class="label">Readiness</div>
+            <div id="medOsScore" class="value">0</div>
+          </div>
+        </div>
+        <div id="medicalResearchOs" class="os-layout">
+          <div class="os-card wide"><div class="mini-note">正在加载医学研究 OS 状态...</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-bottom: 22px;">
+      <div class="section">
+        <h2>交付就绪度</h2>
+        <div id="deliveryReadiness" class="readiness-grid">
+          <div class="readiness-card"><div class="value">等待交付</div><div class="mini-note">运行或打包论文后，这里会展示质量门禁、事实核查、证据富化和人工审阅待办。</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-bottom: 22px;">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="workflow">流程监控</button>
+        <button class="tab-btn" data-tab="reports">汇报与论文</button>
+        <button class="tab-btn" data-tab="files">交付文件</button>
+        <button class="tab-btn" data-tab="compare">靶点对比</button>
+      </div>
+
+      <div id="tab-workflow" class="tab-content active">
+        <div class="grid" style="padding: 22px;">
+          <div>
+            <h2 style="margin-bottom:16px;">研究流程</h2>
+            <div id="stageList" class="workflow"></div>
+          </div>
+          <div>
+            <h2 style="margin-bottom:16px;">启动研究任务</h2>
+            <form id="runForm" class="run-form">
+              <div class="form-grid">
+                <label>靶点<input name="target" value="CDK4" required></label>
+                <label>疾病<input name="disease" value="breast cancer" required></label>
+                <label>癌种<input name="cancers" value="BRCA,LUAD" required></label>
+                <label>治疗模态<select name="modality"><option value="small_molecule">small_molecule</option><option value="antibody">antibody</option><option value="cell_therapy">cell_therapy</option><option value="gene_therapy">gene_therapy</option></select></label>
+                <label>风险等级<select name="risk_level"><option value="medium">medium</option><option value="low">low</option><option value="high">high</option></select></label>
+              </div>
+              <button id="runButton" class="primary" type="submit">运行完整研究流程</button>
+              <div id="formMessage" class="mini-note">将调用本地四阶段流程并生成论文交付，完成后可查看质量门禁、事实核查和 ZIP。</div>
+            </form>
+            <h2 style="margin: 22px 0 16px;">运行日志</h2>
+            <div id="logView" class="log-view">等待流程输出...</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-reports" class="tab-content">
+        <div class="section">
+          <h2>分析汇报与期刊论文</h2>
+          <div id="reportNote" class="info-banner">
+            左侧导航包含<strong>四阶段分析汇报</strong>与<strong>期刊论文</strong>（中文 IMRaD + 嵌入图表 + 逐篇文献评述）。
+            另提供<strong>《中华肿瘤杂志》格式草稿</strong>、医学事实核查报告和交付 ZIP；投稿前仍需作者、伦理、基金、原创实验和专家审校。
+          </div>
+          <div id="reportSummary" class="summary-cards"></div>
+          <div id="reportLayout" class="report-layout" style="display:none;">
+            <div id="reportNav" class="report-nav"></div>
+            <div id="reportContent" class="report-view"></div>
+          </div>
+          <div id="reportEmpty" class="empty-state">
+            <div class="icon">&#128196;</div>
+            <p>暂无可读汇报。请先运行一次完整分析，或点击下方刷新。</p>
+            <button id="reportRefresh" class="btn-secondary" type="button" style="margin-top:12px;">刷新汇报</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-files" class="tab-content">
+        <div class="section">
+          <h2>研究者交付文件</h2>
+          <div id="filesScopeNote" class="section-note">仅展示当前分析任务的核心交付物（报告、证据包、商业计划）。原始 JSON 与溯源文件收纳在「高级数据」中。</div>
+          <div id="fileGrid" class="file-grid"></div>
+          <div id="advancedToggle" class="advanced-toggle" style="display:none;">展开高级数据文件</div>
+          <div id="advancedGrid" class="file-grid advanced-grid"></div>
+        </div>
+      </div>
+
+      <div id="tab-compare" class="tab-content">
+        <div class="section">
+          <h2>靶点综合对比</h2>
+          <div id="compareContent">
+            <div class="empty-state"><div class="icon">&#128200;</div><p>完成分析后，将自动汇总表达、成药性、临床试验与商业指标</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="previewModal" class="modal-backdrop">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div id="previewTitle" class="modal-title">文件预览</div>
+        <button id="previewClose" class="modal-close" type="button">关闭</button>
+      </div>
+      <div id="previewBody"></div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script type="module">
+    import { rewriteArtifactRelativeUrls } from './artifactPreview.js';
+
+    const stageOrder = ["stage1","stage2","stage3","stage4"];
+    const stageLabels = { stage1:"Stage 1 Expression", stage2:"Stage 2 Screening", stage3:"Stage 3 Deep Research", stage4:"Stage 4 Business" };
+    const stageListEl = document.getElementById("stageList");
+    const logViewEl = document.getElementById("logView");
+    const formMessageEl = document.getElementById("formMessage");
+    const runButtonEl = document.getElementById("runButton");
+
+    let currentStatus = null;
+    let reportBundle = null;
+    let activeReportSection = null;
+    let reviewActionInFlight = false;
+
+    if (window.marked) {
+      marked.setOptions({ breaks: true, gfm: true });
+    }
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    function metricChip(label, value) {
+      if (value === undefined || value === null || value === "") return "";
+      return '<div class="stage-metric"><strong>' + label + ':</strong> ' + value + '</div>';
+    }
+
+    function renderStages(status) {
+      const stages = status.stages || {};
+      stageListEl.innerHTML = stageOrder.map(key => {
+        const stage = stages[key] || {};
+        const metrics = stage.metrics || {};
+        const chips = [
+          metricChip("Status", stage.status || "pending"),
+          metricChip("Started", stage.started_at ? new Date(stage.started_at).toLocaleTimeString() : ""),
+          metricChip("Finished", stage.finished_at ? new Date(stage.finished_at).toLocaleTimeString() : ""),
+          metricChip("Confidence", metrics.confidence_level),
+          metricChip("Candidates", metrics.candidate_count),
+          metricChip("Rank", metrics.target_rank),
+          metricChip("Target score", metrics.target_score),
+          metricChip("Druggability", metrics.target_druggability),
+          metricChip("Trials", metrics.trial_count),
+          metricChip("Success", metrics.success_rate),
+          metricChip("Cost", metrics.total_cost),
+          metricChip("Duration", metrics.total_duration),
+          metricChip("Developability", metrics.developability_score),
+        ].filter(Boolean).join("");
+        const error = stage.error ? '<div class="mini-note" style="color:var(--fail);margin-top:10px;">' + stage.error + '</div>' : "";
+        return '<article class="stage-card ' + (stage.status || "pending") + '"><div class="stage-top"><div class="stage-name">' + (stage.label || stageLabels[key]) + '</div><div class="stage-status">' + (stage.status || "pending") + '</div></div><div class="stage-metrics">' + (chips || '<div class="stage-metric">Waiting...</div>') + '</div>' + error + '</article>';
+      }).join("");
+    }
+
+    function renderLogs(logs) {
+      if (!logs || !logs.length) { logViewEl.textContent = "等待流程输出..."; return; }
+      logViewEl.textContent = logs.map(e => {
+        const ts = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : "--:--:--";
+        return "[" + ts + "] " + e.level.toUpperCase() + "  " + e.message;
+      }).join("\n");
+      logViewEl.scrollTop = logViewEl.scrollHeight;
+    }
+
+    function readinessCard(title, value, note, items, state) {
+      const list = items && items.length
+        ? '<ul>' + items.slice(0, 6).map(item => '<li>' + escapeHtml(item) + '</li>').join('') + '</ul>'
+        : '';
+      return '<article class="readiness-card ' + (state || '') + '">'
+        + '<h3>' + escapeHtml(title) + '</h3>'
+        + '<div class="value">' + escapeHtml(value) + '</div>'
+        + '<div class="mini-note">' + escapeHtml(note || '') + '</div>'
+        + list
+        + '</article>';
+    }
+
+    function researcherReadinessCard(card) {
+      const details = Array.isArray(card.details) ? card.details : [];
+      const list = details.length
+        ? '<ul>' + details.slice(0, 5).map(item => '<li>' + escapeHtml(item) + '</li>').join('') + '</ul>'
+        : '';
+      const state = card.state || 'pending';
+      const reviewStatus = card.review_status || '';
+      const reviewClass = reviewStatus === 'approved'
+        ? 'pass'
+        : reviewStatus === 'rejected'
+          ? 'fail'
+          : reviewStatus && reviewStatus !== 'pending'
+            ? 'warning'
+            : 'pending';
+      const reviewMeta = reviewStatus
+        ? '<div class="os-meta"><span class="os-chip ' + reviewClass + '">Memory review: ' + escapeHtml(reviewStatus) + '</span>'
+          + (card.reviewer ? '<span class="os-chip">reviewer ' + escapeHtml(card.reviewer) + '</span>' : '')
+          + '</div>'
+        : '';
+      const reviewActions = memoryReviewActions(card);
+      return '<article class="readiness-card ' + escapeHtml(state) + '">'
+        + '<div class="readiness-top"><h3>' + escapeHtml(card.title || '') + '</h3>'
+        + '<div class="readiness-status">' + escapeHtml(card.status_label || state) + '</div></div>'
+        + '<div class="value">' + escapeHtml(card.value || '-') + '</div>'
+        + reviewMeta
+        + '<div class="mini-note">' + escapeHtml(card.summary || '') + '</div>'
+        + list
+        + reviewActions
+        + '<div class="readiness-action">' + escapeHtml(card.next_action || '') + '</div>'
+        + '</article>';
+    }
+
+    function memoryReviewActions(card) {
+      if (card.id !== "learning_candidate" || !card.candidate_id) return "";
+      const actions = Array.isArray(card.review_actions) && card.review_actions.length
+        ? card.review_actions
+        : ["approve", "reject", "stale", "restore"];
+      const labels = { approve: "批准", reject: "拒绝", stale: "标记过期", restore: "恢复复审" };
+      const classes = { approve: "pass", reject: "fail", stale: "warning", restore: "warning" };
+      return '<div class="memory-review-actions">'
+        + actions.map(action => '<button type="button" class="btn-secondary ' + (classes[action] || '') + '" data-memory-review-action="' + escapeAttr(action) + '" data-candidate-id="' + escapeAttr(card.candidate_id) + '"' + (reviewActionInFlight ? ' disabled' : '') + '>' + escapeHtml(labels[action] || action) + '</button>').join('')
+        + '</div>';
+    }
+
+    function stateText(state) {
+      if (state === "pass") return "PASS";
+      if (state === "warning") return "REVIEW";
+      if (state === "fail") return "BLOCKED";
+      if (state === "pending") return "PENDING";
+      return state || "UNKNOWN";
+    }
+
+    function renderOsList(items, renderItem) {
+      return '<ul class="os-list">' + items.map(renderItem).join('') + '</ul>';
+    }
+
+    function renderMedicalResearchOs(status) {
+      const container = document.getElementById("medicalResearchOs");
+      if (!container) return;
+      const os = status.summary?.medical_research_os || {};
+      const product = os.product || {};
+      const operating = os.operating_model || {};
+      const loop = os.loop_readiness || {};
+      const team = os.research_team || {};
+      const memory = os.memory_strategy || {};
+      const tokenCost = os.token_cost || {};
+      const runtime = os.runtime_readiness || status.summary?.medical_runtime_readiness || {};
+      const promptStudio = os.prompt_studio || {};
+      const signals = Array.isArray(loop.signals) ? loop.signals : [];
+      const roles = Array.isArray(team.roles) ? team.roles : [];
+      const gates = Array.isArray(team.review_gates) ? team.review_gates : [];
+      const runtimeCards = Array.isArray(runtime.cards) ? runtime.cards : [];
+      const templates = Array.isArray(promptStudio.templates) ? promptStudio.templates : [];
+      const migrations = Array.isArray(os.next_migrations) ? os.next_migrations : [];
+      const tokenSummary = tokenCost.summary || {};
+      const tokenLanes = Array.isArray(tokenCost.by_medical_lane) ? tokenCost.by_medical_lane : [];
+      const titleEl = document.getElementById("medOsTitle");
+      const taglineEl = document.getElementById("medOsTagline");
+      const scoreEl = document.getElementById("medOsScore");
+      if (titleEl) titleEl.textContent = product.cn_name || product.name || "MedSCALE Research OS";
+      if (taglineEl) taglineEl.textContent = product.tagline || "医学研究 Agent 协作、证据门禁、记忆沉淀和交付审计的研究者视图。";
+      if (scoreEl) scoreEl.textContent = String(operating.readiness_score ?? loop.score ?? 0);
+
+      const signalHtml = signals.length
+        ? renderOsList(signals, signal => '<li><strong>' + escapeHtml(signal.label || signal.id || '') + '</strong><small><span class="os-chip ' + escapeHtml(signal.state || 'pending') + '">' + stateText(signal.state) + '</span> ' + escapeHtml(signal.summary || '') + '</small></li>')
+        : '<div class="mini-note">等待运行或交付状态。</div>';
+
+      const roleHtml = roles.length
+        ? renderOsList(roles, role => '<li><strong>' + escapeHtml(role.name || role.id || '') + '</strong><small>' + escapeHtml(role.responsibility || '') + ' · <span class="os-chip ' + escapeHtml(role.state || 'pending') + '">' + stateText(role.state) + '</span></small><small>' + escapeHtml(role.reason || '') + '</small></li>')
+        : '<div class="mini-note">等待协作角色计划。</div>';
+
+      const gateHtml = gates.length
+        ? renderOsList(gates.slice(0, 6), gate => '<li><strong>' + escapeHtml(gate.id || '') + '</strong><small>owner=' + escapeHtml(gate.owner || '') + ' · <span class="os-chip ' + escapeHtml(gate.state || 'pending') + '">' + stateText(gate.state) + '</span></small></li>')
+        : '<div class="mini-note">等待 review gate。</div>';
+
+      const templateHtml = templates.length
+        ? '<div class="os-template-grid">' + templates.map(template => '<div class="os-template"><strong>' + escapeHtml(template.title || template.id || '') + '</strong><div class="os-meta"><span class="os-chip">' + escapeHtml(template.phase || '') + '</span><span class="os-chip">' + escapeHtml(template.role || '') + '</span></div><div class="mini-note">' + escapeHtml(template.output || '') + '</div></div>').join('') + '</div>'
+        : '<div class="mini-note">等待医学 Prompt Studio 模板。</div>';
+
+      const migrationHtml = migrations.length
+        ? renderOsList(migrations.slice(0, 5), item => '<li><small>' + escapeHtml(item) + '</small></li>')
+        : '<div class="mini-note">暂无迁移待办。</div>';
+
+      const runtimeHtml = runtimeCards.length
+        ? renderOsList(runtimeCards, card => '<li><strong>' + escapeHtml(card.title || card.id || '') + '</strong><small><span class="os-chip ' + escapeHtml(card.state || 'pending') + '">' + stateText(card.state) + '</span> ' + escapeHtml(card.status_label || '') + '</small><small>' + escapeHtml(card.summary || '') + '</small><small>' + escapeHtml((card.details || []).slice(0, 3).join(' | ')) + '</small></li>')
+        : '<div class="mini-note">Waiting for MedSCALE runtime doctor.</div>';
+      const tokenCostValue = tokenSummary.estimated_cost_usd === null || tokenSummary.estimated_cost_usd === undefined
+        ? "unknown"
+        : "$" + Number(tokenSummary.estimated_cost_usd || 0).toFixed(6);
+      const tokenLaneHtml = tokenLanes.length
+        ? renderOsList(tokenLanes.slice(0, 6), lane => '<li><strong>' + escapeHtml(lane.label || lane.key || '') + '</strong><small>' + escapeHtml(String(lane.records || 0)) + ' record(s) · ' + escapeHtml(String(lane.total_tokens || 0)) + ' tokens</small></li>')
+        : '<div class="mini-note">No model usage recorded yet.</div>';
+      const memoryCandidateState = memory.candidate_state || 'review-required';
+      const memoryCandidateClass = memoryCandidateState === 'approved' || memoryCandidateState === 'promotable'
+        ? 'pass'
+        : memoryCandidateState === 'rejected'
+          ? 'fail'
+          : memoryCandidateState === 'pending'
+            ? 'pending'
+            : 'warning';
+
+      container.innerHTML =
+        '<article class="os-card"><h3>运行模式</h3><div class="os-meta">'
+        + '<span class="os-chip">' + escapeHtml(operating.mode || 'multi-agent') + '</span>'
+        + '<span class="os-chip ' + (operating.status === 'blocked' ? 'fail' : operating.status === 'ready-for-expert-review' ? 'pass' : 'warning') + '">' + escapeHtml(operating.status || 'insufficient-evidence') + '</span>'
+        + '<span class="os-chip">workflow ' + escapeHtml(product.source_upgrade || 'MedSCALE native workflow') + '</span>'
+        + '</div><div class="mini-note">ready=' + (operating.ready_signals ?? 0) + ' / warning=' + (operating.warning_signals ?? 0) + ' / missing=' + (operating.missing_signals ?? 0) + '</div>'
+        + '<div class="mini-note">runtime=' + escapeHtml(runtime.status || 'unknown') + ' / score=' + escapeHtml(String(runtime.score ?? '-')) + '</div></article>'
+        + '<article class="os-card"><h3>Agent Loop Readiness</h3>' + signalHtml + '</article>'
+        + '<article class="os-card"><h3>医学研究团队</h3>' + roleHtml + '</article>'
+        + '<article class="os-card"><h3>Review Gates</h3>' + gateHtml + '</article>'
+        + '<article class="os-card"><h3>Memory Strategy</h3><div class="os-meta">'
+        + '<span class="os-chip">' + escapeHtml(memory.routing || 'gbrain-only') + '</span>'
+        + '<span class="os-chip ' + (memory.seed_state === 'ready' ? 'pass' : 'pending') + '">' + escapeHtml(memory.seed_state || 'pending') + '</span>'
+        + '<span class="os-chip ' + memoryCandidateClass + '">' + escapeHtml(memoryCandidateState) + '</span>'
+        + '<span class="os-chip ' + (memory.review_ready ? 'pass' : 'pending') + '">review ' + escapeHtml(memory.review_status || 'pending') + '</span>'
+        + '</div><div class="mini-note">' + escapeHtml(memory.candidate_id || memory.record_path || '等待记忆播种与学习候选。') + '</div></article>'
+        + '<article class="os-card"><h3>Token / Cost</h3><div class="os-meta">'
+        + '<span class="os-chip ' + (tokenCost.status === 'ready' ? 'pass' : 'warning') + '">' + escapeHtml(tokenCost.status || 'pending') + '</span>'
+        + '<span class="os-chip">' + escapeHtml(String(tokenSummary.total_tokens || 0)) + ' tokens</span>'
+        + '<span class="os-chip">' + escapeHtml(String(tokenSummary.cache_savings_tokens || 0)) + ' saved</span>'
+        + '<span class="os-chip">' + escapeHtml(tokenCostValue) + '</span>'
+        + '</div>' + tokenLaneHtml + '</article>'
+        + '<article class="os-card"><h3>下一步迁移</h3>' + migrationHtml + '</article>'
+        + '<article class="os-card wide"><h3>Runtime Doctor</h3><div class="os-meta">'
+        + '<span class="os-chip ' + (runtime.status === 'ready' ? 'pass' : runtime.status === 'blocked' ? 'fail' : 'warning') + '">' + escapeHtml(runtime.status || 'unknown') + '</span>'
+        + '<span class="os-chip">score ' + escapeHtml(String(runtime.score ?? '-')) + '</span>'
+        + '<span class="os-chip">missing ' + escapeHtml(String((runtime.required_missing || []).length || 0)) + '</span>'
+        + '</div>' + runtimeHtml + '</article>'
+        + '<article class="os-card wide"><h3>医学 Prompt Studio</h3>' + templateHtml + '</article>';
+    }
+
+    function formatReviewExample(item) {
+      if (!item) return "";
+      const parts = [];
+      if (item.pmid) parts.push("PMID " + item.pmid);
+      if (item.study_design) parts.push(item.study_design);
+      if (item.source) parts.push(item.source);
+      if (item.evidence_level) parts.push(item.evidence_level);
+      return parts.join(" · ");
+    }
+
+    function renderDeliveryReadiness(status) {
+      const el = document.getElementById("deliveryReadiness");
+      if (!el) return;
+      const summary = status.summary || {};
+      const readiness = summary.delivery_readiness || {};
+      const quality = summary.quality_gate || {};
+      const fact = summary.fact_check || {};
+      const qualityFindings = readiness.quality_findings || [];
+      const evidence = readiness.literature_evidence || {};
+      const todo = readiness.human_review_todo || [];
+      const reviewExamples = readiness.review_examples || [];
+      const reviewFiles = readiness.review_files || {};
+      const packageAudit = readiness.package_audit || summary.package_audit || {};
+      const memorySeed = readiness.memory_seed || {};
+      const learningCandidate = readiness.learning_candidate || {};
+      const researcherCards = Array.isArray(readiness.researcher_cards) ? readiness.researcher_cards : [];
+      if (researcherCards.length) {
+        el.innerHTML = researcherCards.map(researcherReadinessCard).join("");
+        return;
+      }
+      const qualityVerdict = quality.passed === true ? "PASS" : quality.passed === false ? "FAIL" : "UNKNOWN";
+      const factVerdict = fact.passed === true ? "PASS" : fact.passed === false ? "FAIL" : "UNKNOWN";
+      const findingItems = qualityFindings.map(item => {
+        const severity = item.severity || "unknown";
+        const id = item.id || "quality";
+        const message = item.message || "";
+        return "[" + severity + "] " + id + ": " + message;
+      });
+      const sources = (evidence.sources || []).length ? evidence.sources.join(", ") : "none";
+      const evidenceItems = [
+        "reviews=" + (evidence.count ?? "-") + "; agent=" + (evidence.agent_cache_count ?? 0) + "; llm=" + (evidence.llm_count ?? 0) + "; rule=" + (evidence.rule_based_count ?? 0),
+        "sources=" + sources,
+        "MeSH=" + (evidence.mesh_count ?? 0) + "; citations=" + (evidence.citation_count_available ?? 0) + "; cache=" + (evidence.cache_used ? "used" : "not used"),
+      ];
+      const reviewItems = [
+        "Agent tasks=" + (reviewFiles.task_path ? "ready" : "missing") + "; cache=" + (reviewFiles.cache_path ? "ready" : "pending"),
+      ].concat(reviewExamples.map(formatReviewExample).filter(Boolean));
+      const packageItems = [
+        "entries=" + (packageAudit.entry_count ?? 0) + "; files checked=" + (packageAudit.files_checked ?? 0),
+        "README=" + (packageAudit.readme_present ? "ready" : "missing") + "; manifest=" + (packageAudit.manifest_present ? "ready" : "missing"),
+        "images checked=" + (packageAudit.image_refs_checked ?? 0) + "; links checked=" + (packageAudit.markdown_refs_checked ?? 0),
+      ];
+      (packageAudit.broken_image_refs || []).slice(0, 3).forEach(item => packageItems.push("broken image=" + (item.resolved_path || item.reference || "unknown")));
+      (packageAudit.broken_markdown_refs || []).slice(0, 3).forEach(item => packageItems.push("broken link=" + (item.resolved_path || item.reference || "unknown")));
+      const memoryWarnings = (memorySeed.warnings || []).slice(0, 4).map(item => "warning=" + item);
+      const memoryMissingRoles = memorySeed.missing_roles || [];
+      const memoryItems = [
+        "provider=" + (memorySeed.provider || "not seeded"),
+        "record=" + (memorySeed.record_ready ? "ready" : "missing") + "; summary=" + (memorySeed.summary_ready ? "ready" : "missing"),
+        "sources=" + (memorySeed.source_file_count ?? 0) + "; staged=" + (memorySeed.staged_file_count ?? 0),
+        "missing roles=" + (memoryMissingRoles.length ? memoryMissingRoles.join(", ") : "none"),
+      ].concat(memoryWarnings);
+      const qualityState = quality.passed === false ? "fail" : qualityFindings.length ? "warning" : quality.passed === true ? "pass" : "";
+      const factState = fact.passed === false ? "fail" : fact.passed === true ? "pass" : "";
+      const reviewState = evidence.upgrade_needed ? "warning" : (evidence.agent_or_llm_count ?? 0) > 0 ? "pass" : "";
+      const packageState = packageAudit.passed === false
+        ? "fail"
+        : packageAudit.passed === true
+          ? "pass"
+          : (packageAudit.entry_count || packageAudit.files_checked ? "warning" : "");
+      const packageValue = packageAudit.passed === true
+        ? "PASS"
+        : packageAudit.passed === false
+          ? "FAIL"
+          : "PENDING";
+      const packageNote = packageAudit.passed === true
+        ? "ZIP 内文件、README、manifest 以及 Markdown 本地图表引用已经通过自检。"
+        : packageAudit.passed === false
+          ? "交付 ZIP 已生成，但包内存在断链、缺失文件或归档不一致，需修复后再交付。"
+          : "尚未获得当前 ZIP 的归档审计结果。";
+      const memoryState = memorySeed.import_ok === false
+        ? "fail"
+        : memorySeed.import_ok === true
+          ? ((memorySeed.warnings || []).length || memoryMissingRoles.length ? "warning" : "pass")
+          : (memorySeed.record_ready || memorySeed.summary_ready ? "warning" : "");
+      const memoryValue = (memorySeed.provider || "memory") + " " + (
+        memorySeed.import_ok === true
+          ? "READY"
+          : memorySeed.import_ok === false
+            ? "FAILED"
+            : (memorySeed.record_ready || memorySeed.summary_ready ? "PARTIAL" : "PENDING")
+      );
+      const memoryNote = memorySeed.import_ok === true
+        ? "\u533b\u5b66\u4ea4\u4ed8\u6458\u8981\u5df2\u64ad\u79cd\u5230\u8bb0\u5fc6\u4f9b\u5e94\u5546\uff0c\u53ef\u7528\u4e8e\u540e\u7eed recall \u4e0e\u7814\u7a76\u8fde\u7eed\u6027\u3002"
+        : (memorySeed.record_ready || memorySeed.summary_ready)
+          ? "\u5df2\u751f\u6210\u672c\u5730 memory seed \u4ea4\u4ed8\u7269\uff0c\u4f46\u5bfc\u5165\u8fd8\u9700\u590d\u6838\u6216\u8865\u8dd1\u3002"
+          : "\u5c1a\u672a\u4e3a\u5f53\u524d\u4ea4\u4ed8\u751f\u6210 memory seed \u8bb0\u5f55\u3002";
+      const learningWarnings = (learningCandidate.warnings || []).slice(0, 4).map(item => "warning=" + item);
+      const learningReviewStatus = learningCandidate.review_status || "pending";
+      const learningItems = [
+        "candidate=" + (learningCandidate.candidate_id || "missing"),
+        "record=" + (learningCandidate.record_ready ? "ready" : "missing") + "; summary=" + (learningCandidate.summary_ready ? "ready" : "missing"),
+        "recommended=" + (learningCandidate.recommended_action || "pending"),
+        "review=" + (learningCandidate.review_ready ? "ready" : "pending") + "; status=" + learningReviewStatus,
+        "brain=" + (
+          learningCandidate.brain_ingest_ok === true
+            ? "candidate-node-ready"
+            : learningCandidate.brain_ingest_ok === false
+              ? "ingest-failed"
+              : "not-ingested"
+        ),
+      ].concat(learningWarnings);
+      const learningState = learningCandidate.brain_ingest_ok === false
+        ? "fail"
+        : learningReviewStatus === "approved"
+          ? "pass"
+          : learningReviewStatus === "rejected"
+            ? "fail"
+            : learningReviewStatus === "stale" || learningReviewStatus === "restored"
+              ? "warning"
+              : learningCandidate.promotable
+                ? "pass"
+                : learningCandidate.record_ready || learningCandidate.summary_ready
+                  ? "warning"
+                  : "";
+      const learningValue = learningReviewStatus === "approved"
+        ? "APPROVED"
+        : learningReviewStatus === "rejected"
+          ? "REJECTED"
+          : learningReviewStatus === "stale"
+            ? "STALE"
+            : learningReviewStatus === "restored"
+              ? "RESTORED"
+              : learningCandidate.promotable
+                ? "READY"
+                : learningCandidate.recommended_action === "resolve-failures-first"
+                  ? "BLOCKED"
+                  : learningCandidate.record_ready || learningCandidate.summary_ready
+                    ? "REVIEW"
+                    : "PENDING";
+      const learningNote = learningReviewStatus === "approved"
+        ? "learning candidate 已通过 Memory Brain 人工审核，可进入后续医学研究 recall 与复用。"
+        : learningReviewStatus === "rejected"
+          ? "learning candidate 已被拒绝，不应进入长期知识或后续 recall。"
+          : learningReviewStatus === "stale"
+            ? "learning candidate 已被标记为 stale，需要更新证据后再复用。"
+            : learningReviewStatus === "restored"
+              ? "learning candidate 已恢复复审，等待下一轮人工批准。"
+              : learningCandidate.promotable
+                ? "\u533b\u5b66\u4ea4\u4ed8\u5df2\u6c89\u6dc0\u4e3a\u53ef\u5ba1\u9605 learning candidate\uff0c\u53ef\u7ee7\u7eed\u63a8\u8fdb\u5230 Memory Brain \u6216\u77e5\u8bc6\u5e93\u4eba\u5de5\u590d\u5ba1\u6d41\u7a0b\u3002"
+                : learningCandidate.recommended_action === "resolve-failures-first"
+                  ? "\u5f53\u524d\u4ea4\u4ed8\u8fd8\u6709\u672a\u89e3\u51b3\u8d28\u91cf/\u4e8b\u5b9e\u95ee\u9898\uff0c\u5e94\u5148\u4fee\u590d\u540e\u518d\u63a8\u8fdb\u957f\u671f\u77e5\u8bc6\u6c89\u6dc0\u3002"
+                  : learningCandidate.record_ready || learningCandidate.summary_ready
+                    ? "\u5df2\u751f\u6210 learning candidate\uff0c\u4f46\u8fd8\u9700\u8865\u5145\u8bc1\u636e\u6216\u4eba\u5de5\u5ba1\u9605\u540e\u624d\u9002\u5408\u63a8\u8fdb\u3002"
+                    : "\u5c1a\u672a\u4e3a\u5f53\u524d\u4ea4\u4ed8\u751f\u6210 learning candidate \u8bb0\u5f55\u3002";
+      const readinessCards = [
+        readinessCard("\u8d28\u91cf\u95e8\u7981", qualityVerdict + " " + (quality.grade || "") + " " + (quality.score ?? "-"), (quality.errors ?? 0) + " errors / " + (quality.warnings ?? 0) + " warnings", findingItems, qualityState),
+        readinessCard("\u4e8b\u5b9e\u6838\u67e5", factVerdict + " " + (fact.score ?? "-"), (fact.errors ?? 0) + " errors / " + (fact.warnings ?? 0) + " warnings; unverified=" + ((fact.unverified_claims || []).length ?? 0), [], factState),
+        readinessCard("\u6587\u732e\u8bc4\u8ff0\u6765\u6e90", "agent " + (evidence.agent_cache_count ?? 0) + " / llm " + (evidence.llm_count ?? 0) + " / rule " + (evidence.rule_based_count ?? 0), evidence.upgrade_needed ? "\u5f53\u524d\u4ecd\u542b\u89c4\u5219\u56de\u9000\u8bc4\u8ff0\uff0c\u5efa\u8bae\u8fd0\u884c Agent/LLM \u5347\u7ea7\u3002" : "\u5df2\u5177\u5907 Agent/LLM \u6df1\u5ea6\u8bc4\u8ff0\u4fe1\u53f7\u3002", reviewItems, reviewState),
+        readinessCard("ZIP 自检", packageValue, packageNote, packageItems, packageState),
+        readinessCard("\u8bb0\u5fc6\u64ad\u79cd", memoryValue, memoryNote, memoryItems, memoryState),
+        readinessCard("\u5b66\u4e60\u6c89\u6dc0", learningValue, learningNote, learningItems, learningState),
+        readinessCard("\u8bc1\u636e\u4e0e\u4e0b\u4e00\u6b65\u5ba1\u9605", sources, "\u6587\u732e\u5bcc\u5316\u72b6\u6001\u4e0e\u5fc5\u8981\u4eba\u5de5\u5ba1\u9605\u4e8b\u9879", evidenceItems.concat(todo), todo.length ? "warning" : "pass"),
+      ];
+      el.innerHTML = readinessCards.join("");
+    }
+
+    function renderStatus(status) {
+      currentStatus = status;
+      const runStatus = status.status || "idle";
+      const completedCount = Object.values(status.stages || {}).filter(s => s.status === "completed").length;
+      const s4 = status.stages?.stage4?.metrics || {};
+      const s3 = status.stages?.stage3?.metrics || {};
+      document.getElementById("runStatusPill").className = "status-pill " + runStatus;
+      document.getElementById("runStatusPill").textContent = runStatus;
+      document.getElementById("currentStageText").className = "status-pill " + runStatus;
+      document.getElementById("currentStageText").textContent = status.current_stage_label || "\u7b49\u5f85\u542f\u52a8";
+      document.getElementById("metaTarget").textContent = status.target || "-";
+      document.getElementById("metaDisease").textContent = status.disease || "-";
+      document.getElementById("metaRunId").textContent = status.run_id || "-";
+      document.getElementById("metaUpdated").textContent = status.updated_at ? new Date(status.updated_at).toLocaleString() : "-";
+      document.getElementById("metricProgress").textContent = (status.progress_percent || 0) + "%";
+      document.getElementById("metricCompleted").textContent = completedCount + " / 4";
+      document.getElementById("metricSuccessRate").textContent = s4.success_rate || "-";
+      document.getElementById("metricTrials").textContent = s3.trial_count || "-";
+      const manuscriptQuality = status.summary?.quality_gate || null;
+      const qualityVerdict = manuscriptQuality?.passed === true
+        ? "PASS"
+        : manuscriptQuality?.passed === false
+          ? "FAIL"
+          : "UNKNOWN";
+      const qualityText = manuscriptQuality
+        ? qualityVerdict + " " + (manuscriptQuality.score ?? "-")
+        : "-";
+      const qualityMetricEl = document.getElementById("metricManuscriptQuality");
+      if (qualityMetricEl) qualityMetricEl.textContent = qualityText;
+      const factCheck = status.summary?.fact_check || null;
+      const factVerdict = factCheck?.passed === true
+        ? "PASS"
+        : factCheck?.passed === false
+          ? "FAIL"
+          : "UNKNOWN";
+      const factText = factCheck
+        ? factVerdict + " " + (factCheck.score ?? "-")
+        : "-";
+      const factMetricEl = document.getElementById("metricFactCheck");
+      if (factMetricEl) factMetricEl.textContent = factText;
+      const packageReady = Boolean(status.artifacts?.delivery_package || status.summary?.delivery_package);
+      const packageAudit = status.summary?.package_audit || {};
+      const packageMetricEl = document.getElementById("metricDeliveryPackage");
+      if (packageMetricEl) packageMetricEl.textContent = !packageReady
+        ? "-"
+        : packageAudit?.passed === true
+          ? "PASS"
+          : packageAudit?.passed === false
+            ? "FAIL"
+            : "READY";
+      document.getElementById("globalProgressFill").style.width = (status.progress_percent || 0) + "%";
+      renderMedicalResearchOs(status);
+      renderDeliveryReadiness(status);
+      renderStages(status);
+      renderLogs(status.logs || []);
+      runButtonEl.disabled = runStatus === "running";
+      if (runStatus === "completed") {
+        loadFiles();
+      }
+    }
+
+    function renderReportSummary(cards) {
+      const el = document.getElementById("reportSummary");
+      if (!cards || !cards.length) { el.innerHTML = ""; return; }
+      el.innerHTML = cards.map(card =>
+        '<div class="summary-card"><div class="label">' + escapeHtml(card.label) + '</div><div class="value">' + escapeHtml(card.value) + '</div></div>'
+      ).join("");
+    }
+
+    function renderReportNav(sections) {
+      const nav = document.getElementById("reportNav");
+      nav.innerHTML = sections.map(section => {
+        const missing = !section.path;
+        const cls = "report-nav-btn" + (activeReportSection === section.id ? " active" : "") + (missing ? " missing" : "");
+        return '<button type="button" class="' + cls + '" data-section="' + section.id + '" ' + (missing ? 'disabled' : '') + '>'
+          + escapeHtml(section.title_zh)
+          + '<small>' + escapeHtml(section.subtitle_zh || "") + '</small></button>';
+      }).join("");
+      nav.querySelectorAll(".report-nav-btn:not(.missing)").forEach(btn => {
+        btn.addEventListener("click", () => showReportSection(btn.dataset.section));
+      });
+    }
+
+    async function showReportSection(sectionId) {
+      if (!reportBundle) return;
+      const section = (reportBundle.sections || []).find(s => s.id === sectionId);
+      if (!section || !section.path) return;
+      activeReportSection = sectionId;
+      renderReportNav(reportBundle.sections || []);
+      const reportEl = document.getElementById("reportContent");
+      reportEl.innerHTML = '<div class="preview-text">加载中...</div>';
+      try {
+        if (section.kind === "html") {
+          reportEl.innerHTML = '<iframe class="preview-frame" style="min-height:560px;" src="/api/download?inline=1&path=' + encodeURIComponent(section.path) + '"></iframe>';
+          return;
+        }
+        const resp = await fetch("/api/artifact?path=" + encodeURIComponent(section.path));
+        if (!resp.ok) throw new Error("无法读取汇报文件");
+        const text = await resp.text();
+        if (window.marked) {
+          renderMarkdownInto(reportEl, text, section.path);
+        } else {
+          reportEl.innerHTML = '<div class="preview-text">' + escapeHtml(text) + '</div>';
+        }
+      } catch (error) {
+        reportEl.innerHTML = '<div class="preview-text" style="color:var(--fail);">加载失败：' + escapeHtml(error.message) + '</div>';
+      }
+    }
+
+    async function loadReports() {
+      const layout = document.getElementById("reportLayout");
+      const empty = document.getElementById("reportEmpty");
+      try {
+        const resp = await fetch("/api/reports");
+        if (!resp.ok) throw new Error("无法加载汇报");
+        reportBundle = await resp.json();
+        if (!reportBundle.available) {
+          layout.style.display = "none";
+          empty.style.display = "block";
+          renderReportSummary([]);
+          return;
+        }
+        empty.style.display = "none";
+        layout.style.display = "grid";
+        renderReportSummary(reportBundle.summary_cards || []);
+        const first = (reportBundle.sections || []).find(s => s.path && s.id === "manuscript")
+          || (reportBundle.sections || []).find(s => s.path);
+        activeReportSection = first ? first.id : null;
+        renderReportNav(reportBundle.sections || []);
+        if (first) await showReportSection(first.id);
+      } catch (error) {
+        layout.style.display = "none";
+        empty.style.display = "block";
+        empty.querySelector("p").textContent = "加载汇报失败：" + error.message;
+      }
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function escapeAttr(text) {
+      return escapeHtml(text).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function renderMarkdownInto(container, markdown, artifactPath) {
+      if (!window.marked) {
+        container.innerHTML = '<div class="preview-text">' + escapeHtml(markdown) + '</div>';
+        return;
+      }
+      container.innerHTML = marked.parse(markdown);
+      rewriteArtifactRelativeUrls(container, artifactPath);
+    }
+
+    function formatMetricValue(value, format) {
+      if (value === undefined || value === null || value === "") return "—";
+      if (format === "percent") return (Number(value) * 100).toFixed(2) + "%";
+      if (format === "score") return Number(value).toFixed(3);
+      if (format === "money") return "$" + Number(value).toFixed(1) + "M";
+      if (format === "months") return Number(value) + " 个月";
+      if (format === "bool") return value ? "是" : "否";
+      if (format === "rank") return "第 " + value + " 名";
+      if (format === "phase") return "Phase " + value;
+      return String(value);
+    }
+
+    function renderFileCard(item) {
+      const sizeKB = (item.size / 1024).toFixed(1);
+      const badgeCls = {".json":"badge-json",".md":"badge-md",".html":"badge-html",".pdf":"badge-pdf",".docx":"badge-docx"}[item.suffix] || "";
+      const previewBtn = item.previewable
+        ? '<button class="btn-secondary" type="button" data-action="preview" data-path="' + escapeHtml(item.path) + '" data-title="' + escapeHtml(item.title_zh) + '">预览</button>'
+        : '';
+      return '<article class="file-card">'
+        + '<div><span class="badge ' + badgeCls + '">' + escapeHtml(item.category_label || item.category || '') + '</span></div>'
+        + '<div class="file-title">' + escapeHtml(item.title_zh || item.filename) + '</div>'
+        + '<div class="file-desc">' + escapeHtml(item.description_zh || '') + '</div>'
+        + '<div class="file-meta">' + sizeKB + ' KB · ' + escapeHtml(item.filename) + '</div>'
+        + '<div class="file-actions">' + previewBtn
+        + '<a class="btn-download" href="/api/download?path=' + encodeURIComponent(item.path) + '">下载</a></div>'
+        + '</article>';
+    }
+
+    // Files tab
+    async function loadFiles() {
+      const fileGrid = document.getElementById("fileGrid");
+      const advancedGrid = document.getElementById("advancedGrid");
+      const advancedToggle = document.getElementById("advancedToggle");
+      try {
+        const resp = await fetch("/api/artifacts");
+        if (!resp.ok) { fileGrid.innerHTML = '<div class="empty-state"><p>无法获取文件列表</p></div>'; return; }
+        const data = await resp.json();
+        const deliverables = data.deliverables || [];
+        const advanced = data.advanced || [];
+        const scopeNote = document.getElementById("filesScopeNote");
+        if (data.current_target) {
+          scopeNote.textContent = "当前任务：" + data.current_target + " / " + (data.current_disease || "—") + "。以下仅展示该任务的核心交付物。";
+        }
+        if (!deliverables.length) {
+          fileGrid.innerHTML = '<div class="empty-state"><div class="icon">&#128193;</div><p>暂无交付文件，请先完成一次完整分析</p></div>';
+        } else {
+          fileGrid.innerHTML = deliverables.map(renderFileCard).join("");
+        }
+        if (advanced.length) {
+          advancedToggle.style.display = "block";
+          advancedToggle.textContent = advancedGrid.classList.contains("open") ? "收起高级数据文件" : "展开高级数据文件（" + advanced.length + "）";
+          advancedGrid.innerHTML = advanced.map(renderFileCard).join("");
+        } else {
+          advancedToggle.style.display = "none";
+          advancedGrid.innerHTML = "";
+        }
+        bindFileActions();
+      } catch(e) {
+        fileGrid.innerHTML = '<div class="empty-state"><p>加载文件列表失败</p></div>';
+      }
+    }
+
+    function bindFileActions() {
+      document.querySelectorAll('[data-action="preview"]').forEach(btn => {
+        btn.addEventListener('click', () => previewFile(btn.dataset.path, btn.dataset.title));
+      });
+    }
+
+    function renderJsonSummary(rows) {
+      if (!rows || !rows.length) return "";
+      return '<div class="json-summary">' + rows.map(row =>
+        '<div class="json-summary-item"><div class="label">' + escapeHtml(row.label) + '</div><div class="value">' + escapeHtml(row.value) + '</div></div>'
+      ).join("") + '</div>';
+    }
+
+    async function previewFile(path, title) {
+      const modal = document.getElementById("previewModal");
+      const body = document.getElementById("previewBody");
+      document.getElementById("previewTitle").textContent = title || "文件预览";
+      body.innerHTML = '<div class="preview-text">加载中...</div>';
+      modal.classList.add("open");
+      try {
+        const suffix = path.split('.').pop().toLowerCase();
+        if (["html", "pdf"].includes(suffix)) {
+          body.innerHTML = '<iframe class="preview-frame" src="/api/download?inline=1&path=' + encodeURIComponent(path) + '"></iframe>';
+          return;
+        }
+        if (["png", "svg", "jpg", "jpeg", "gif", "webp"].includes(suffix)) {
+          body.innerHTML = '<div class="preview-image-shell"><img class="preview-image" alt="' + escapeHtml(title || path.split('/').pop() || 'preview') + '" src="/api/download?inline=1&path=' + encodeURIComponent(path) + '"></div>';
+          return;
+        }
+        const resp = await fetch("/api/artifact?path=" + encodeURIComponent(path));
+        if (!resp.ok) throw new Error("无法读取文件");
+        const text = await resp.text();
+        if (suffix === "json") {
+          const parsed = JSON.parse(text);
+          const pretty = JSON.stringify(parsed, null, 2);
+          let summaryHtml = "";
+          try {
+            const sumResp = await fetch("/api/preview-summary?path=" + encodeURIComponent(path));
+            if (sumResp.ok) {
+              const sumData = await sumResp.json();
+              summaryHtml = renderJsonSummary(sumData.rows || []);
+            }
+          } catch (_) {}
+          body.innerHTML = summaryHtml
+            + '<div class="raw-toggle" data-toggle="raw">展开原始 JSON</div>'
+            + '<pre class="raw-json" id="rawJsonBlock">' + escapeHtml(pretty) + '</pre>';
+          body.querySelector("[data-toggle='raw']").addEventListener("click", (e) => {
+            const block = document.getElementById("rawJsonBlock");
+            const open = block.classList.toggle("open");
+            e.target.textContent = open ? "收起原始 JSON" : "展开原始 JSON";
+          });
+          return;
+        }
+        if (suffix === "md" && window.marked) {
+          body.innerHTML = '<div class="report-view"></div>';
+          renderMarkdownInto(body.querySelector(".report-view"), text, path);
+          return;
+        }
+        body.innerHTML = '<div class="preview-text">' + escapeHtml(text) + '</div>';
+      } catch (error) {
+        body.innerHTML = '<div class="preview-text" style="color:var(--fail);">预览失败：' + escapeHtml(error.message) + '</div>';
+      }
+    }
+
+    document.getElementById("previewClose").addEventListener("click", () => {
+      document.getElementById("previewModal").classList.remove("open");
+      document.getElementById("previewBody").innerHTML = "";
+    });
+    document.getElementById("previewModal").addEventListener("click", event => {
+      if (event.target.id === "previewModal") {
+        document.getElementById("previewModal").classList.remove("open");
+      }
+    });
+    document.getElementById("advancedToggle").addEventListener("click", () => {
+      const grid = document.getElementById("advancedGrid");
+      const toggle = document.getElementById("advancedToggle");
+      grid.classList.toggle("open");
+      toggle.textContent = grid.classList.contains("open")
+        ? "收起高级数据文件"
+        : "展开高级数据文件（" + grid.children.length + "）";
+    });
+
+    let compareChartInstance = null;
+
+    // Compare tab
+    async function loadComparison() {
+      const el = document.getElementById("compareContent");
+      try {
+        const resp = await fetch("/api/compare");
+        if (!resp.ok) throw new Error("无法加载对比数据");
+        const data = await resp.json();
+        const profiles = data.profiles || [];
+        if (!profiles.length) {
+          el.innerHTML = '<div class="empty-state"><div class="icon">&#128200;</div><p>暂无可对比靶点，请先完成分析</p></div>';
+          return;
+        }
+
+        let html = '<div class="compare-summary">' + escapeHtml(data.recommendation || "") + '</div>';
+        html += '<table><tr><th>对比指标</th>';
+        profiles.forEach(p => html += '<th>' + escapeHtml(p.target) + '<br><span style="font-weight:400;color:var(--muted);font-size:12px;">' + escapeHtml(p.disease) + '</span></th>');
+        html += '</tr>';
+
+        (data.rows || []).forEach(row => {
+          html += '<tr><td>' + escapeHtml(row.label_zh) + '</td>';
+          profiles.forEach(profile => {
+            const bucket = profile.metrics[row.stage] || {};
+            html += '<td>' + formatMetricValue(bucket[row.key], row.format) + '</td>';
+          });
+          html += '</tr>';
+        });
+        html += '</table>';
+
+        if (profiles.length >= 2) {
+          html += '<h3 style="margin-top:20px;">成药性 vs 整体成功率</h3><div class="chart-container"><canvas id="compareChart"></canvas></div>';
+        }
+        el.innerHTML = html;
+
+        if (profiles.length >= 2 && window.Chart) {
+          if (compareChartInstance) compareChartInstance.destroy();
+          const labels = profiles.map(p => p.target + " / " + p.disease);
+          const drugScores = profiles.map(p => Number((p.metrics.stage2 || {}).target_druggability || (p.metrics.stage4 || {}).druggability_score || 0));
+          const successRates = profiles.map(p => Number((p.metrics.stage4 || {}).overall_success_rate || 0) * 100);
+          compareChartInstance = new Chart(document.getElementById('compareChart'), {
+            type: 'bar',
+            data: {
+              labels,
+              datasets: [
+                { label: '成药性评分', data: drugScores, backgroundColor: '#0f766e', borderRadius: 4 },
+                { label: '整体成功率(%)', data: successRates, backgroundColor: '#d97706', borderRadius: 4 },
+              ]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { position: 'top' } },
+              scales: { y: { beginAtZero: true } }
+            }
+          });
+        }
+      } catch (error) {
+        el.innerHTML = '<div class="empty-state"><p>加载对比数据失败：' + escapeHtml(error.message) + '</p></div>';
+      }
+    }
+
+    // Fetch status
+    async function fetchStatus() {
+      try {
+        const response = await fetch("/api/status");
+        const data = await response.json();
+        renderStatus(data);
+      } catch (error) {
+        formMessageEl.textContent = "Status fetch failed: " + error.message;
+      }
+    }
+
+    // Run form
+    document.getElementById("runForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const payload = Object.fromEntries(formData.entries());
+      formMessageEl.textContent = "Starting local pipeline...";
+      try {
+        const response = await fetch("/api/run", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+        const data = await response.json();
+        if (!response.ok || !data.ok) { formMessageEl.textContent = data.error || "Unable to start pipeline."; return; }
+        formMessageEl.textContent = "Pipeline started. Run ID: " + data.run_id;
+        fetchStatus();
+      } catch (error) { formMessageEl.textContent = "Start failed: " + error.message; }
+    });
+
+    async function submitMemoryReviewAction(button) {
+      const action = button.dataset.memoryReviewAction || "";
+      const candidateId = button.dataset.candidateId || "";
+      const reasonDefaults = {
+        approve: "quality/fact/package evidence reviewed",
+        reject: "insufficient or unsafe evidence",
+        stale: "newer evidence may supersede this candidate",
+        restore: "fresh evidence added for renewed review",
+      };
+      const reason = window.prompt("Memory review reason: " + action, reasonDefaults[action] || "");
+      if (reason === null) return;
+      reviewActionInFlight = true;
+      formMessageEl.textContent = "Submitting Memory Brain review: " + action + " / " + candidateId;
+      fetchStatus();
+      try {
+        const response = await fetch("/api/memory-review", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({
+            action,
+            candidate_id: candidateId,
+            reviewer: "18766-dashboard",
+            reason,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+          formMessageEl.textContent = data.error || "Memory review failed.";
+          return;
+        }
+        formMessageEl.textContent = "Memory review updated: " + (data.status || action);
+      } catch (error) {
+        formMessageEl.textContent = "Memory review failed: " + error.message;
+      } finally {
+        reviewActionInFlight = false;
+        fetchStatus();
+      }
+    }
+
+    document.addEventListener("click", event => {
+      const button = event.target.closest("[data-memory-review-action]");
+      if (!button) return;
+      event.preventDefault();
+      if (reviewActionInFlight || button.disabled) return;
+      submitMemoryReviewAction(button);
+    });
+
+    // Init
+    fetchStatus();
+    setInterval(fetchStatus, 2000);
+    document.querySelector('[data-tab="compare"]').addEventListener('click', loadComparison);
+    document.querySelector('[data-tab="files"]').addEventListener('click', loadFiles);
+    document.querySelector('[data-tab="reports"]').addEventListener('click', loadReports);
+    document.getElementById("reportRefresh").addEventListener("click", loadReports);
+  </script>
+</body>
+</html>

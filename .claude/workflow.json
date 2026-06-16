@@ -1,0 +1,136 @@
+{
+  "version": "2.0",
+  "project": "scale-engine",
+  "description": "Repository workflow for developing scale-engine itself.",
+  "currentPhase": "idle",
+  "currentTier": "standard",
+  "phaseHistory": [],
+  "gates": {
+    "G1_explore": {
+      "status": "pending",
+      "description": "Explore current repo state and record the main contradiction.",
+      "verification": "bash scripts/gates/G1-verify.sh",
+      "autoCheck": false,
+      "verifiedAt": null
+    },
+    "G2_plan": {
+      "status": "pending",
+      "description": "Plan includes scope, risk, rollback, and reality check.",
+      "verification": "bash scripts/gates/G2-verify.sh",
+      "autoCheck": false,
+      "verifiedAt": null
+    },
+    "G3_tdd": {
+      "status": "pending",
+      "description": "Behavior changes in src/ should be accompanied by test changes.",
+      "verification": "bash scripts/gates/G3-verify.sh",
+      "autoCheck": true,
+      "verifiedAt": null
+    },
+    "G4_lint": {
+      "status": "pending",
+      "description": "Workflow scripts parse and required helper files exist.",
+      "verification": "bash scripts/gates/G4-verify.sh",
+      "autoCheck": true,
+      "verifiedAt": null
+    },
+    "G5_test": {
+      "status": "pending",
+      "description": "Repository lint, typecheck, test, and build pass.",
+      "verification": "bash scripts/gates/G5-verify.sh",
+      "autoCheck": true,
+      "verifiedAt": null
+    },
+    "G6_artifacts": {
+      "status": "pending",
+      "description": "Task evidence and diff hygiene are complete.",
+      "verification": "bash scripts/gates/G6-verify.sh",
+      "autoCheck": true,
+      "verifiedAt": null
+    },
+    "G7_security": {
+      "status": "pending",
+      "description": "Security validation passes or is explicitly blocked.",
+      "verification": "bash scripts/gates/G7-verify.sh",
+      "autoCheck": false,
+      "verifiedAt": null
+    },
+    "G8_docs": {
+      "status": "pending",
+      "description": "Changed markdown and workflow artifacts meet documentation hygiene rules.",
+      "verification": "bash scripts/gates/G8-verify.sh",
+      "autoCheck": true,
+      "verifiedAt": null
+    }
+  },
+  "tierConfig": {
+    "sandbox": {
+      "flow": [
+        "execute",
+        "verify"
+      ],
+      "gates": [
+        "G4",
+        "G5"
+      ],
+      "description": "Small local changes."
+    },
+    "standard": {
+      "flow": [
+        "explore",
+        "plan",
+        "execute",
+        "verify",
+        "consolidate"
+      ],
+      "gates": [
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6",
+        "G8"
+      ],
+      "description": "Default repository workflow."
+    },
+    "critical": {
+      "flow": [
+        "explore",
+        "plan",
+        "review",
+        "execute",
+        "verify",
+        "security",
+        "consolidate"
+      ],
+      "gates": [
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6",
+        "G7",
+        "G8"
+      ],
+      "description": "Release, security, or destructive changes."
+    }
+  },
+  "autoEscalation": {
+    "enabled": true,
+    "rules": [
+      {
+        "pattern": "auth|security|token|credential|oauth|permission",
+        "escalateTo": "critical",
+        "reason": "Security-sensitive change"
+      },
+      {
+        "pattern": "release|publish|tag|npm",
+        "escalateTo": "critical",
+        "reason": "Release-sensitive change"
+      }
+    ]
+  },
+  "lastUpdated": "2026-05-20T00:00:00Z"
+}

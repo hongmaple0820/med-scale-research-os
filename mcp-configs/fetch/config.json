@@ -1,0 +1,9 @@
+{
+  "name": "fetch",
+  "description": "Web content fetching",
+  "command": "npx",
+  "args": ["-y", "@anthropic/mcp-fetch"],
+  "env": {},
+  "tools": ["fetch", "fetch_multiple"],
+  "whenToUse": "Fetching web content and APIs"
+}

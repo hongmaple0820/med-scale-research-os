@@ -1,0 +1,41 @@
+name: SCALE Gate Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main, master]
+
+jobs:
+  scale-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install SCALE Engine
+        run: npm install -g @hongmaple0820/scale-engine
+
+      - name: Run Preflight Gates
+        id: gates
+        run: |
+          scale preflight --json --profile ci 2>&1 | tee scale-gates.json
+          echo "## SCALE Gate Results" >> $GITHUB_STEP_SUMMARY
+          scale preflight --json --profile ci 2>&1 >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Gate Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scale-gate-evidence
+          path: |
+            .scale/evidence/
+            scale-gates.json
+          retention-days: 30

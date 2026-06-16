@@ -1,0 +1,144 @@
+version: 1
+product: MedSCALE Research OS
+
+governance:
+  autoHealthCheck: true
+  healthCheckIntervalMs: 30000
+  blockUntrusted: false
+  requiredCapabilities:
+    - medical-literature.search
+    - medical-fact-check.claim-map
+    - medical-memory-review.candidate-state
+    - medical-package-audit.manifest
+    - medical-evidence-manifest.query
+  maxLatencyMs: 5000
+
+servers:
+  - id: medical-literature
+    name: MedSCALE Literature Retrieval
+    transport: stdio
+    command: npx
+    args:
+      - -y
+      - "@anthropic/mcp-fetch"
+    version: 0.1.0
+    securityLevel: review
+    capabilities:
+      - medical-literature.search
+      - pubmed.search
+      - openalex.search
+      - citation.fetch
+      - source-citation.verify
+
+  - id: medical-fact-check
+    name: MedSCALE Claim Fact Check
+    transport: stdio
+    command: npx
+    args:
+      - -y
+      - "@anthropic/mcp-fetch"
+    version: 0.1.0
+    securityLevel: review
+    capabilities:
+      - medical-fact-check.claim-map
+      - claim.source-link
+      - claim.contradiction-check
+      - guideline.compare
+      - unverified-claims.export
+
+  - id: medical-memory-review
+    name: MedSCALE Memory Brain Review
+    transport: stdio
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-memory"
+    version: 0.1.0
+    securityLevel: review
+    capabilities:
+      - medical-memory-review.candidate-state
+      - memory.seed
+      - memory.learning-candidate
+      - memory.approve
+      - memory.reject
+      - memory.stale
+      - memory.restore
+
+  - id: medical-package-audit
+    name: MedSCALE Delivery Package Audit
+    transport: stdio
+    command: npx
+    args:
+      - -y
+      - "@anthropic/mcp-filesystem"
+      - "."
+    version: 0.1.0
+    securityLevel: trusted
+    capabilities:
+      - medical-package-audit.manifest
+      - delivery-manifest.read
+      - package-audit.report
+      - figure-reference.check
+      - zip-content.audit
+
+  - id: medical-evidence-manifest
+    name: MedSCALE Evidence Manifest Query
+    transport: stdio
+    command: npx
+    args:
+      - -y
+      - "@anthropic/mcp-filesystem"
+      - "."
+    version: 0.1.0
+    securityLevel: trusted
+    capabilities:
+      - medical-evidence-manifest.query
+      - evidence-table.read
+      - provenance.trace
+      - output-manifest.read
+      - dashboard-status.read
+
+routes:
+  medical-literature:
+    config: mcp-configs/fetch/config.json
+    nativeSources:
+      - target-research-platform/src/api_clients/pubmed_client.py
+      - target-research-platform/src/api_clients/openalex_client.py
+    artifacts:
+      - literature-search-strategy.md
+      - literature-evidence-table.md
+
+  medical-fact-check:
+    config: mcp-configs/fetch/config.json
+    nativeSources:
+      - target-research-platform/output/manuscripts/*_fact_check.json
+    artifacts:
+      - claim-evidence-map.md
+      - unverified-claims.md
+
+  medical-memory-review:
+    config: mcp-configs/memory/config.json
+    nativeSources:
+      - target-research-platform/output/manuscripts/*_memory_seed.json
+      - target-research-platform/output/manuscripts/*_learning_candidate.json
+    artifacts:
+      - memory-seed-report.json
+      - learning-candidate-review.md
+
+  medical-package-audit:
+    config: mcp-configs/filesystem/config.json
+    nativeSources:
+      - target-research-platform/src/output/delivery_packager.py
+      - target-research-platform/output/manuscripts/*_delivery_manifest.json
+    artifacts:
+      - package-audit-report.json
+      - figure-reference-check.md
+
+  medical-evidence-manifest:
+    config: mcp-configs/filesystem/config.json
+    nativeSources:
+      - target-research-platform/output/manuscripts/*_delivery_manifest.json
+      - target-research-platform/output/manuscripts/*_evidence*.json
+    artifacts:
+      - delivery-manifest-review.md
+      - data-provenance.md

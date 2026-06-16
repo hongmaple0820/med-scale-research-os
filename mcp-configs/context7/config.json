@@ -1,0 +1,9 @@
+{
+  "name": "context7",
+  "description": "Documentation lookup for libraries",
+  "command": "npx",
+  "args": ["-y", "@anthropic/mcp-context7"],
+  "env": {},
+  "tools": ["resolve-library-id", "query-docs"],
+  "whenToUse": "User asks about library/framework usage"
+}

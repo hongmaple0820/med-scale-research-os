@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "lastReviewedAt": "2026-05-15",
+  "reviewIntervalDays": 90,
+  "frameworks": [
+    {
+      "name": "citty",
+      "area": "cli",
+      "rule": "CLI output is allowed in src/api and src/cli; business/runtime libraries should use structured logging."
+    },
+    {
+      "name": "pino",
+      "area": "logging",
+      "rule": "Runtime logs should use structured records and must not include raw secrets, tokens, credentials, cookies, or authorization headers."
+    },
+    {
+      "name": "vitest",
+      "area": "testing",
+      "rule": "Behavior changes require focused regression tests before implementation and full-suite verification before release."
+    }
+  ],
+  "orm": [],
+  "ui": {
+    "designSystem": "",
+    "componentLibrary": "",
+    "visualReviewRequired": true
+  },
+  "architecture": {
+    "layers": [
+      "api",
+      "workflow",
+      "artifact",
+      "guardrails",
+      "capabilities",
+      "adapters"
+    ],
+    "dependencyRule": "CLI and adapters may depend on workflow services; workflow services should not depend on CLI output formatting."
+  },
+  "bannedImports": []
+}

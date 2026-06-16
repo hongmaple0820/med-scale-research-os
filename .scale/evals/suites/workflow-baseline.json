@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "id": "workflow-baseline",
+  "name": "SCALE workflow baseline",
+  "cases": [
+    {
+      "id": "governance-command-smoke",
+      "type": "bugfix",
+      "title": "Command evidence smoke",
+      "task": "Verify that a local command can produce concrete eval evidence.",
+      "phase": "verify",
+      "successCriteria": [
+        "command exits 0",
+        "output contains scale-eval-ok"
+      ],
+      "attempts": [
+        {
+          "id": "attempt-1",
+          "command": "node -e \"console.log('scale-eval-ok')\"",
+          "expectedExitCode": 0,
+          "outputContains": "scale-eval-ok"
+        }
+      ]
+    }
+  ]
+}

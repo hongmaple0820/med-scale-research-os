@@ -1,0 +1,305 @@
+---
+name: target-intelligence
+description: >
+  药物靶点智能分析工作流。当用户提到靶点分析、靶点筛选、表达分析、
+  预后分析、药物研发、竞争格局、专利分析时触发。
+  Agent 自动从权威数据库获取真实数据，运行计算分析，生成结构化报告。
+triggers:
+  - 靶点
+  - 靶点分析
+  - 靶点筛选
+  - 表达分析
+  - 预后分析
+  - 生存分析
+  - 药物靶点
+  - target analysis
+  - target screening
+  - druggability
+  - 竞争格局
+  - 专利分析
+  - 临床管线
+---
+
+# Target Intelligence — Agent Workflow
+
+You are a biomedical research agent. Your job is to analyze drug targets using
+real data from authoritative databases. NEVER fabricate data. ALL numerical
+values MUST come from API calls or computed results.
+
+## Decision Tree
+
+When the user asks about a target, determine which phase(s) to run:
+
+```
+User mentions a SPECIFIC gene + disease?
+  → Run Phase 1 (expression + prognosis)
+  → If user also asks about drugs/pipeline/competition → Run Phase 3
+
+User asks "find targets for [disease]"?
+  → Run Phase 2 (screening + prioritization)
+
+User asks about a specific gene's drug development?
+  → Run Phase 3 (deep research)
+
+User asks about business plan / milestones / investment?
+  → Run Phase 4 (requires Phase 1-3 data first)
+
+User asks a general question?
+  → Ask clarifying questions before proceeding
+```
+
+## How to Execute
+
+All scripts are in `skills/target-intelligence/`. Use the `run_tool.sh` wrapper:
+
+```bash
+bash skills/target-intelligence/shared/run_tool.sh <script.py> [args]
+```
+
+The wrapper automatically finds the script across all phase directories and
+sets up PYTHONPATH for imports.
+
+## Phase 1: Expression Panorama & Prognosis
+
+**When**: User provides a gene symbol AND a cancer type.
+
+**Steps**:
+1. Run `run_phase1.py --gene {GENE} --cancer-type {CANCER} --output-dir ./output/{GENE}`
+2. This executes 5 sub-analyses in sequence:
+   - GTEx tissue expression (54 tissues)
+   - HPA protein validation (cross-validation with GTEx)
+   - TCGA tumor vs normal differential expression
+   - Survival analysis (KM curves, Cox HR)
+   - Immune cell correlation
+3. Read the generated `phase1_{GENE}_{CANCER}_report.json`
+4. Present findings conversationally to the user
+
+**Key outputs to report**:
+- Top tissues where the gene is expressed (TPM values)
+- Whether it's upregulated or downregulated in tumor (log2FC, p-value)
+- Survival hazard ratio (HR > 1 = risk factor, HR < 1 = protective)
+- Which immune cells correlate with expression
+
+**Example trigger**: "帮我分析 EGFR 在肺癌中的表达和预后"
+**Parsed**: gene=EGFR, cancer_type=LUAD
+
+**Example trigger**: "What is the expression profile of PD-L1 across tissues?"
+**Parsed**: gene=CD274, no cancer type → run GTEx only
+
+## Phase 2: Target Screening & Prioritization
+
+**When**: User asks to find/prioritize targets for a disease.
+
+**Steps**:
+1. Run `run_phase2.py --disease "{DISEASE}" --output-dir ./output/{disease_slug}`
+2. This queries Open Targets for target-disease associations
+3. For top 10 targets, checks druggability (Tclin/Tchem/Tbio/Tdark)
+4. Generates priority matrix
+5. Present top candidates with scores and rationale
+
+**Key outputs to report**:
+- Top 10 targets with association scores
+- Druggability classification for each
+- Recommended candidates with justification
+
+**Example trigger**: "帮我筛选肺癌的潜在治疗靶点"
+**Parsed**: disease=lung cancer
+
+## Phase 3: Deep Research & Competitive Landscape
+
+**When**: User asks about a specific target's drug development, patents, or competition.
+
+**Steps**:
+1. Run `run_phase3.py --gene {GENE} --output-dir ./output/{GENE}_research`
+2. This queries ClinicalTrials.gov (trials), ChEMBL (drugs), USPTO (patents)
+3. Generates competitive intelligence report
+4. Present findings: trials by phase, key players, patent trends
+
+**Key outputs to report**:
+- Number of clinical trials and phase distribution
+- Key companies developing against this target
+- Known drugs and mechanisms
+- Patent filing trends
+
+**Example trigger**: "EGFR 的竞争格局怎么样？"
+**Parsed**: gene=EGFR
+
+## Phase 4: Business Plan & Milestones
+
+**When**: User asks about business planning, milestones, or investment.
+
+**Prerequisites**: Phase 1-3 data must exist in `./output/{GENE}/`
+
+**Steps**:
+1. Run `run_phase4.py --gene {GENE} --report-dir ./output/{GENE} --output-dir ./output/{GENE}_business`
+2. This consolidates all prior reports into a business plan
+3. Generates development milestones with timelines and costs
+
+**Key outputs to report**:
+- Development timeline (phases, duration, cost)
+- Overall success probability
+- Key milestones and go/no-go criteria
+
+## Data Integrity Rules
+
+1. **NEVER fabricate numbers** — all TPM, p-values, HR, scores must come from API responses
+2. **ALWAYS cite source** — "According to GTEx API..." or "Based on Open Targets data..."
+3. **ALWAYS show evidence** — display the actual values, not just interpretations
+4. **Cross-validate** — when possible, compare RNA (GTEx) vs protein (HPA) data
+5. **Flag uncertainties** — if API returns no data, say so explicitly
+
+## Error Handling & Agent Fallback
+
+### Python Script Level
+- Scripts have retry logic (3 attempts) and multi-source fallback chains
+- If a script exits with code 2, it means "agent fallback needed"
+- If a script returns empty data, check the `agent_fallback_needed` field in JSON output
+
+### Agent-Level Fallback (CRITICAL)
+
+When Python scripts fail or return insufficient data, YOU must use your capabilities:
+
+**Patent Data (patent_landscape.py returns 0 patents):**
+1. Use Playwright to navigate Google Patents: `https://patents.google.com/?q={GENE}+therapeutic+antibody+inhibitor`
+2. Use Playwright to navigate Lens.org: `https://www.lens.org/lens/search/patent/list?q={GENE}`
+3. Take a snapshot, extract patent titles, assignees, dates
+4. Save extracted data to `output/{GENE}/patent_{gene}_web_scraped.json`
+
+**Drug/Compound Data (competitive_intelligence.py returns 0 drugs):**
+1. Use web search to find "{GENE} inhibitor drugs clinical trials"
+2. Use Playwright to scrape DrugBank or PubChem pages for the target
+3. Extract drug names, mechanisms, approval status
+
+**Expression Data (any API returns 503/timeout):**
+1. Use web search to find "{GENE} expression {CANCER} TCGA GTEx"
+2. Use Playwright to access cBioPortal web interface
+3. Extract expression data from the web UI
+
+**General Pattern:**
+```
+1. Run Python script
+2. If exit code 2 or empty results:
+   a. Log "[AGENT FALLBACK] {source} failed, using web search"
+   b. Use WebSearch/WebFetch/Playwright to gather the same data
+   c. Save results in the same JSON format as the script would
+   d. Add "source": "agent_web_search" to provenance
+3. Continue pipeline with whatever data was obtained
+```
+
+### Playwright Quick Reference
+```
+# Navigate to a page
+browser_navigate url="https://patents.google.com/?q=EGFR+therapeutic"
+
+# Take snapshot to see page content
+browser_snapshot
+
+# Extract text from search results
+browser_evaluate function="() => Array.from(document.querySelectorAll('.result-title')).map(e => e.textContent)"
+
+# Fill search forms
+browser_type selector="input[name=q]" text="EGFR antibody inhibitor"
+browser_press_key key="Enter"
+```
+
+### Existing Error Handling
+- If a gene is not found, suggest alternatives (check spelling, try aliases)
+- If cancer type is ambiguous, ask the user to clarify (e.g., "肺癌是 LUAD 还是 LUSC？")
+- If sample size is too small for survival analysis (< 20), report but warn about low confidence
+
+## Output Location
+
+All outputs go to `skills/target-intelligence/output/{GENE}/`:
+- `skills/target-intelligence/output/EGFR/` for EGFR analysis
+- `skills/target-intelligence/output/lung_cancer/` for disease-level screening
+
+## Presenting Results to User (MANDATORY)
+
+**NEVER give static file:// paths.** Always use the dynamic Dashboard server.
+
+After generating reports, start the dashboard and give the user the URL:
+
+```bash
+cd E:\yixue-scale-engine && PORT=3457 node scripts/dashboard-server.mjs
+```
+
+Then tell the user: **http://localhost:3457**
+
+The dashboard reads from `skills/target-intelligence/output/` and provides:
+- Interactive file browser with module grouping
+- JSON/Markdown/HTML preview
+- Image preview (charts, heatmaps)
+- Export to MD/DOCX/PPT
+
+If port 3457 is in use, check if the server is already running:
+```bash
+curl -s http://localhost:3457/api/meta
+```
+If it responds, the server is already running — just give the URL.
+
+## Required Dependencies
+
+Before first run, install Python packages:
+```bash
+pip install requests pandas numpy scipy matplotlib seaborn lifelines python-pptx
+```
+
+## Advanced Features
+
+### TME Immune Profiling (Phase 1)
+
+After immune correlation analysis, the pipeline automatically classifies the Tumor Microenvironment (TME) phenotype:
+
+- **Hot (Inflamed)**: High immune infiltration, likely responsive to immunotherapy
+- **Cold (Desert)**: Low immune infiltration, resistant to immunotherapy
+- **Immune Excluded**: Immune cells present but excluded from tumor core
+- **Immunosuppressive**: Active immune suppression by Tregs/MDSCs
+
+Output: `tme_{GENE}_{CANCER}_profile.json`
+
+### Evidence-Graded Research Profile (Phase 3)
+
+Phase 3 generates a 9-path research profile with evidence grading:
+
+| Grade | Symbol | Description |
+|-------|--------|-------------|
+| T1 | ★★★ | FDA-approved, validated, Phase 3 |
+| T2 | ★★☆ | Phase 2, strong preclinical, peer-reviewed |
+| T3 | ★☆☆ | Phase 1, preliminary, conference |
+| T4 | ☆☆☆ | In silico, in vitro, theoretical |
+
+Research paths:
+1. Target Mechanism
+2. Clinical Pipeline
+3. Biomarker Analysis
+4. Resistance Mechanisms
+5. Combination Strategies
+6. Safety Profile
+7. Patient Stratification
+8. Competitive Intelligence
+9. Translational Readiness
+
+Output: `tooluniverse_{GENE}_research_profile.json`
+
+### PPTX Generation (Phase 4)
+
+Phase 4 生成 Nature Skills 输入文件，用于生成高质量 PPT：
+
+**工作流定位：**
+- 我们的工作流 = 数据采集/分析
+- nature-skills = 报告/PPT生成
+
+**使用方式：**
+1. 运行 Phase 4 生成输入文件: `nature_input_{GENE}.json` 和 `nature_input_{GENE}.md`
+2. 调用 nature-paper2ppt 生成 PPT:
+   ```
+   /nature-paper2ppt
+   ```
+3. 提供输入文件路径或数据目录
+
+**为什么使用 nature-skills：**
+- 专业的学术写作原则（以科学论证为骨架）
+- 质量检查机制（自我审查/修正循环）
+- 设计原则（防溢出、多样化构图）
+- 术语一致性保证
+- 9步专业工作流

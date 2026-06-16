@@ -79,6 +79,8 @@ coverage/
 
 # Build & test outputs
 output/
+!src/output/
+!src/output/*.ts
 test_output/
 
 # Target research platform — track only files needed by npm pack

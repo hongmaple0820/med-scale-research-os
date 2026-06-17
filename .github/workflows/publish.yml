@@ -78,11 +78,14 @@ jobs:
       - name: Publish dry run
         run: npm publish --dry-run --json --registry=https://registry.npmjs.org > medscale-publish-dry-run.json
 
+      - name: Pack dry run for package contents
+        run: npm pack --dry-run --json --registry=https://registry.npmjs.org > medscale-pack-dry-run.json
+
       - name: Check publish dry-run package contents
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
-          const dryRun = JSON.parse(readFileSync('medscale-publish-dry-run.json', 'utf8'))
+          const dryRun = JSON.parse(readFileSync('medscale-pack-dry-run.json', 'utf8'))
           const pack = Array.isArray(dryRun) ? dryRun[0] : dryRun
           const files = new Set((pack.files ?? []).map(file => file.path))
           const required = [
@@ -119,7 +122,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: medscale-publish-dry-run
-          path: medscale-publish-dry-run.json
+          path: |
+            medscale-publish-dry-run.json
+            medscale-pack-dry-run.json
           retention-days: 30
 
       - name: Publish to npm

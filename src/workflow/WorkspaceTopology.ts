@@ -123,7 +123,7 @@ export function workspaceTopologyTemplate(options: WorkspaceTopologyTemplateOpti
       name: 'example-service',
       path: 'services/example',
       role: 'service',
-      required: false,
+      required: true,
       services: ['example'],
     })
   } else if (topology === 'moe' || topology === 'polyrepo') {
@@ -131,7 +131,7 @@ export function workspaceTopologyTemplate(options: WorkspaceTopologyTemplateOpti
       name: 'example-service',
       path: '../example-service',
       role: 'external',
-      required: false,
+      required: true,
       services: ['example'],
       branchPattern: 'codex/*',
       remote: 'origin',
@@ -143,7 +143,7 @@ export function workspaceTopologyTemplate(options: WorkspaceTopologyTemplateOpti
       name: 'example-service',
       path: 'services/example',
       role: 'submodule',
-      required: false,
+      required: true,
       services: ['example'],
       remote: 'origin',
     })
@@ -217,7 +217,7 @@ function normalizeRepositories(repositories: WorkspaceRepositoryConfig[] | undef
     .map(repo => ({
       ...repo,
       path: normalizeRelative(repo.path),
-      required: repo.required !== false,
+      required: true,
     }))
 
   if (!normalized.some(repo => repo.role === 'root' || repo.path === '.')) {

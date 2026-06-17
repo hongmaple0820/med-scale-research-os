@@ -273,13 +273,11 @@ export class BrowserQACapability {
    */
   async runWithPlaywright(flow: UserFlow): Promise<QAResult> {
     try {
-      // @ts-ignore — optional dependency
       await import('playwright')
     } catch {
       logger.warn('Playwright not installed - falling back to MCP browser')
       return this.runE2ETest(this.baseUrl, flow)
     }
-    // @ts-ignore — optional dependency
     const playwright = await import('playwright')
 
     const result: QAResult = {

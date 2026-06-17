@@ -20,7 +20,6 @@ export interface DiagnosticResult {
   status: 'ok' | 'warn' | 'fail'
   message: string
   fix?: string
-  optional?: boolean // Optional checks don't affect overall health
   category?: 'governance' | 'knowledge-graph' | 'runtime' | 'memory'
 }
 
@@ -87,13 +86,7 @@ export class Doctor {
       ? this.skippedEngineeringStandardsForWorkspaceConflict()
       : this.checkEngineeringStandards()
     const governanceDriftCheck = this.checkGovernanceDrift()
-    governanceTemplatesCheck.optional = true
-    verificationMatrixCheck.optional = true
-    skillRoutingPolicyCheck.optional = true
-    toolPolicyCheck.optional = true
-    resourcePolicyCheck.optional = true
-    engineeringStandardsCheck.optional = true
-    governanceDriftCheck.optional = true
+    // All governance checks are mandatory
     governanceTemplatesCheck.category = 'governance'
     verificationMatrixCheck.category = 'governance'
     skillRoutingPolicyCheck.category = 'governance'
@@ -110,12 +103,10 @@ export class Doctor {
     checks.push(governanceDriftCheck)
 
     const runtimeEvidenceCheck = this.checkRuntimeEvidence()
-    runtimeEvidenceCheck.optional = true
     runtimeEvidenceCheck.category = 'runtime'
     checks.push(runtimeEvidenceCheck)
 
     const configHealthCheck = this.checkConfigHealth()
-    configHealthCheck.optional = true
     configHealthCheck.category = 'governance'
     checks.push(configHealthCheck)
 
@@ -126,12 +117,6 @@ export class Doctor {
     const codegraphCheck = this.checkCodegraph(toolCapabilities, bootstrapPlan)
     const codegraphProjectCheck = this.checkCodegraphProject(codeIntelligence)
     const memoryRoutingCheck = this.checkMemoryProviders(memoryProviders, bootstrapPlan)
-    pythonCheck.optional = true
-    graphifyCheck.optional = true
-    graphifyArtifactCheck.optional = true
-    codegraphCheck.optional = true
-    codegraphProjectCheck.optional = true
-    memoryRoutingCheck.optional = true
     pythonCheck.category = 'knowledge-graph'
     graphifyCheck.category = 'knowledge-graph'
     graphifyArtifactCheck.category = 'knowledge-graph'
@@ -145,8 +130,8 @@ export class Doctor {
     checks.push(codegraphProjectCheck)
     checks.push(memoryRoutingCheck)
 
-    // Calculate overall health excluding optional checks
-    const coreChecks = checks.filter((c) => !c.optional)
+    // Calculate overall health including all checks
+    const coreChecks = checks
     const fails = coreChecks.filter((c) => c.status === 'fail').length
     const warns = coreChecks.filter((c) => c.status === 'warn').length
     const overall = fails > 0 ? 'broken' : warns > 0 ? 'degraded' : 'healthy'
@@ -926,39 +911,39 @@ export class Doctor {
       `${'─'.repeat(50)}`,
     ]
 
-    // Core checks first
-    for (const check of report.checks.filter((c) => !c.optional)) {
+    // All checks
+    for (const check of report.checks) {
       lines.push(`  ${statusIcon[check.status]} ${check.name}: ${check.message}`)
       if (check.fix) lines.push(`     💡 Fix: ${check.fix}`)
     }
 
     lines.push(`${'─'.repeat(50)}`)
 
-    const governanceChecks = report.checks.filter((c) => c.optional && c.category === 'governance')
+    const governanceChecks = report.checks.filter((c) => c.category === 'governance')
     if (governanceChecks.length > 0) {
       lines.push('')
-      lines.push('Project Governance (Optional):')
+      lines.push('Project Governance:')
       for (const check of governanceChecks) {
         lines.push(`  ${statusIcon[check.status]} ${check.name}: ${check.message}`)
         if (check.fix) lines.push(`     Fix: ${check.fix}`)
       }
     }
 
-    // Knowledge graph section (optional checks)
-    const optionalChecks = report.checks.filter((c) => c.optional && c.category === 'knowledge-graph')
-    if (optionalChecks.length > 0) {
+    // Knowledge graph section
+    const knowledgeChecks = report.checks.filter((c) => c.category === 'knowledge-graph')
+    if (knowledgeChecks.length > 0) {
       lines.push('')
-      lines.push('📦 Knowledge Graph (Optional):')
-      for (const check of optionalChecks) {
+      lines.push('📦 Knowledge Graph:')
+      for (const check of knowledgeChecks) {
         lines.push(`  ${statusIcon[check.status]} ${check.name}: ${check.message}`)
         if (check.fix) lines.push(`     💡 Fix: ${check.fix}`)
       }
     }
 
-    const memoryChecks = report.checks.filter((c) => c.optional && c.category === 'memory')
+    const memoryChecks = report.checks.filter((c) => c.category === 'memory')
     if (memoryChecks.length > 0) {
       lines.push('')
-      lines.push('Memory Providers (Optional):')
+      lines.push('Memory Providers:')
       for (const check of memoryChecks) {
         lines.push(`  ${statusIcon[check.status]} ${check.name}: ${check.message}`)
         if (check.fix) lines.push(`     Fix: ${check.fix}`)
@@ -978,17 +963,17 @@ export class Doctor {
           lines.push('  → Use: scale graphify .')
         }
       } else {
-        lines.push('  ⚠️ Code knowledge graph not available (optional feature)')
+        lines.push('  ⚠️ Code knowledge graph not available')
         lines.push('  → Install CodeGraph: npx @colbymchenry/codegraph')
         lines.push('  → Install Graphify: uv tool install graphify && graphify install --platform codex')
       }
       lines.push(`${'─'.repeat(50)}`)
     }
 
-    const runtimeChecks = report.checks.filter((c) => c.optional && c.category === 'runtime')
+    const runtimeChecks = report.checks.filter((c) => c.category === 'runtime')
     if (runtimeChecks.length > 0) {
       lines.push('')
-      lines.push('Runtime Evidence (Optional):')
+      lines.push('Runtime Evidence:')
       for (const check of runtimeChecks) {
         lines.push(`  ${statusIcon[check.status]} ${check.name}: ${check.message}`)
         if (check.fix) lines.push(`     Fix: ${check.fix}`)
@@ -999,8 +984,7 @@ export class Doctor {
     const ok = report.checks.filter((c) => c.status === 'ok').length
     const warn = report.checks.filter((c) => c.status === 'warn').length
     const fail = report.checks.filter((c) => c.status === 'fail').length
-    const optional = report.checks.filter((c) => c.optional).length
-    lines.push(`  ${ok} passed, ${warn} warnings, ${fail} failures (${optional} optional)`)
+    lines.push(`  ${ok} passed, ${warn} warnings, ${fail} failures`)
     return lines.join('\n')
   }
 
@@ -1014,7 +998,7 @@ export class Doctor {
       divider,
     ]
 
-    for (const check of report.checks.filter((c) => !c.optional)) {
+    for (const check of report.checks) {
       lines.push(`  ${statusIcon[check.status]} ${check.name}: ${check.message}`)
       if (check.fix) lines.push(`     Fix: ${check.fix}`)
     }
@@ -1022,7 +1006,7 @@ export class Doctor {
     lines.push(divider)
 
     const appendSection = (title: string, category: NonNullable<DiagnosticResult['category']>) => {
-      const sectionChecks = report.checks.filter((c) => c.optional && c.category === category)
+      const sectionChecks = report.checks.filter((c) => c.category === category)
       if (sectionChecks.length === 0) return
       lines.push('')
       lines.push(title)
@@ -1032,10 +1016,10 @@ export class Doctor {
       }
     }
 
-    appendSection('Project Governance (Optional):', 'governance')
-    appendSection('Knowledge Graph (Optional):', 'knowledge-graph')
-    appendSection('Memory Providers (Optional):', 'memory')
-    appendSection('Runtime Evidence (Optional):', 'runtime')
+    appendSection('Project Governance:', 'governance')
+    appendSection('Knowledge Graph:', 'knowledge-graph')
+    appendSection('Memory Providers:', 'memory')
+    appendSection('Runtime Evidence:', 'runtime')
 
     if (report.knowledgeGraph) {
       const knowledgeGraph = report.knowledgeGraph
@@ -1049,7 +1033,7 @@ export class Doctor {
           lines.push('  -> Use: scale graphify .')
         }
       } else {
-        lines.push('  [WARN] Code knowledge graph not available (optional feature)')
+        lines.push('  [WARN] Code knowledge graph not available')
         lines.push(`  -> Bootstrap inspect: ${report.bootstrapPlan?.inspectCommand ?? 'scale bootstrap deps --pack knowledge --json'}`)
         lines.push(`  -> Bootstrap apply: ${report.bootstrapPlan?.packs.includes('knowledge') ? report.bootstrapPlan.applyCommand : 'scale bootstrap deps --pack knowledge --apply'}`)
       }
@@ -1064,8 +1048,7 @@ export class Doctor {
     const ok = report.checks.filter((c) => c.status === 'ok').length
     const warn = report.checks.filter((c) => c.status === 'warn').length
     const fail = report.checks.filter((c) => c.status === 'fail').length
-    const optional = report.checks.filter((c) => c.optional).length
-    lines.push(`  ${ok} passed, ${warn} warnings, ${fail} failures (${optional} optional)`)
+    lines.push(`  ${ok} passed, ${warn} warnings, ${fail} failures`)
     return lines.join('\n')
   }
 }

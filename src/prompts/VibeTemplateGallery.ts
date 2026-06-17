@@ -242,7 +242,7 @@ export const VISUAL_VIBE_TEMPLATES: VisualVibeTemplate[] = [
 
 成功标准：
 - 产出完整 verification/review/release evidence。
-- 所有 required gates 通过，optional gates 的缺失有说明。
+- 所有 required gates 必须通过。
 - 明确是否可发版，以及剩余风险。`,
   },
 ]

@@ -9,7 +9,7 @@ export interface GovernanceRoiModule {
   evidenceLevel: 'measured' | 'estimated' | 'missing'
   benefit: string
   overhead: string
-  recommendation: 'keep-default' | 'keep-optional' | 'demote' | 'needs-evidence'
+  recommendation: 'keep-default' | 'keep-required' | 'demote' | 'needs-evidence'
 }
 
 export interface GovernanceRoiReport {
@@ -17,7 +17,7 @@ export interface GovernanceRoiReport {
   generatedAt: string
   summary: {
     evidenceLevel: 'measured' | 'estimated' | 'missing'
-    recommendation: 'keep-default' | 'keep-optional' | 'demote' | 'needs-evidence'
+    recommendation: 'keep-default' | 'keep-required' | 'demote' | 'needs-evidence'
   }
   modules: GovernanceRoiModule[]
 }
@@ -59,7 +59,7 @@ export function createGovernanceRoiReport(options: {
       evidenceLevel: 'estimated',
       benefit: `Selected ${options.contextPack.sections.filter(section => section.included).length}/${options.contextPack.sections.length} context section(s); estimated savings ${compiler.estimatedTokenSavings} tokens from ${compiler.totalCandidateTokens} candidates.`,
       overhead: `One relevance ranking pass with ${compiler.ranking.length} candidate section(s).`,
-      recommendation: compiler.estimatedTokenSavings > 0 ? 'keep-default' : 'keep-optional',
+      recommendation: compiler.estimatedTokenSavings > 0 ? 'keep-default' : 'keep-required',
     })
   }
 
@@ -70,7 +70,7 @@ export function createGovernanceRoiReport(options: {
       evidenceLevel: 'estimated',
       benefit: `Recommended ${governance.recommendedMode} mode from ${governance.signals.length} risk signal(s); effective mode ${governance.effectiveMode}.`,
       overhead: `${governance.requiredBehaviors.length} required behavior(s) activated.`,
-      recommendation: governance.effectiveMode === 'minimal' ? 'keep-default' : 'keep-optional',
+      recommendation: governance.effectiveMode === 'minimal' ? 'keep-default' : 'keep-required',
     })
   } else {
     modules.push({
@@ -91,7 +91,7 @@ export function createGovernanceRoiReport(options: {
         ? `Recalled ${memory.items.length} memory item(s) from ${memory.selectedProviders.join(', ') || 'no provider'}; fallback used: ${memory.fallbackUsed}.`
         : `No memory item recalled; provider order was ${memory.providerOrder.join(' -> ')}.`,
       overhead: `${memory.providerOrder.length} provider route(s), ${memory.warnings.length} warning(s).`,
-      recommendation: memory.items.length > 0 ? 'keep-default' : 'keep-optional',
+      recommendation: memory.items.length > 0 ? 'keep-default' : 'keep-required',
     })
   }
 
@@ -102,7 +102,7 @@ export function createGovernanceRoiReport(options: {
       evidenceLevel: plan.executionPlan.steps.length > 0 ? 'estimated' : 'missing',
       benefit: `Detected ${plan.intents.length} intent(s), ${plan.requiredSkills.length} required skill(s), and ${plan.executionPlan.steps.length} executable evidence step(s).`,
       overhead: `${plan.requiredArtifacts.length} required artifact(s), ${plan.requiredVerification.length} verification evidence item(s).`,
-      recommendation: plan.requiredSkills.length > 0 || plan.requiredArtifacts.length > 0 ? 'keep-default' : 'keep-optional',
+      recommendation: plan.requiredSkills.length > 0 || plan.requiredArtifacts.length > 0 ? 'keep-default' : 'keep-required',
     })
   }
 
@@ -115,7 +115,7 @@ export function createGovernanceRoiReport(options: {
         ? `No graph provider answered "${code.query}"; fallback found ${code.files.length} file(s) with ${code.roi.fileReadsSaved} estimated reads saved by scoping.`
         : `Graph provider ${code.provider} returned ${code.hits.length} hit(s), ${code.files.length} file(s), and ${code.roi.fileReadsSaved} estimated file reads saved.`,
       overhead: code.fallbackUsed ? 'One scoped source scan fallback.' : 'One code intelligence provider query.',
-      recommendation: code.fallbackUsed ? 'needs-evidence' : 'keep-optional',
+      recommendation: code.fallbackUsed ? 'needs-evidence' : 'keep-required',
     })
   }
 
@@ -132,8 +132,8 @@ function summarize(modules: GovernanceRoiModule[]): GovernanceRoiReport['summary
   if (modules.some(module => module.recommendation === 'needs-evidence')) {
     return { evidenceLevel: 'estimated', recommendation: 'needs-evidence' }
   }
-  if (modules.some(module => module.recommendation === 'keep-optional')) {
-    return { evidenceLevel: 'estimated', recommendation: 'keep-optional' }
+  if (modules.some(module => module.recommendation === 'keep-required')) {
+    return { evidenceLevel: 'estimated', recommendation: 'keep-required' }
   }
   return { evidenceLevel: 'estimated', recommendation: 'keep-default' }
 }

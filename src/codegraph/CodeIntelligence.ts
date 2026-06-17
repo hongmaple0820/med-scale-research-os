@@ -114,7 +114,7 @@ export interface CodeGraphRoiReport {
   provider?: string
   fallbackUsed: boolean
   metrics: CodeGraphRoiMetrics
-  recommendation: 'keep-default' | 'keep-optional' | 'needs-evidence'
+  recommendation: 'keep-default' | 'keep-required' | 'needs-evidence'
   evidenceLevel: 'measured' | 'estimated'
 }
 
@@ -395,7 +395,7 @@ export function createCodeGraphRoiReport(options: {
     provider: report.provider,
     fallbackUsed: report.fallbackUsed,
     metrics: report.roi,
-    recommendation: report.fallbackUsed ? 'needs-evidence' : 'keep-optional',
+    recommendation: report.fallbackUsed ? 'needs-evidence' : 'keep-required',
     evidenceLevel: report.fallbackUsed ? 'estimated' : 'measured',
   }
 }

@@ -7,7 +7,7 @@ import {
 } from './VerificationProfile.js'
 
 export type GateFamily = 'core' | 'meta' | 'extension'
-export type GateActivation = 'default' | 'profile' | 'optional' | 'policy'
+export type GateActivation = 'default' | 'profile' | 'policy'
 
 export interface GateCatalogEntry {
   id: string

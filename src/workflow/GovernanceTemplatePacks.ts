@@ -1026,7 +1026,7 @@ else
 fi
 echo ""
 
-echo "[CHECK] optional tools"
+echo "[CHECK] required tools"
 for tool in bash rg jq gh graphify; do
   if command -v "$tool" >/dev/null 2>&1; then
     note_ok "$tool"
@@ -1201,7 +1201,7 @@ if ($Npm) {
 }
 Write-Host ''
 
-Write-Host '[CHECK] optional tools'
+Write-Host '[CHECK] required tools'
 foreach ($Tool in @('bash', 'rg', 'jq', 'gh', 'graphify', 'python', 'python3')) {
   if (Get-Command $Tool -ErrorAction SilentlyContinue) {
     Note-Ok $Tool

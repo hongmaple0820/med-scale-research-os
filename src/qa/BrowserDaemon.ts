@@ -34,7 +34,6 @@ export class BrowserDaemon {
 
     // Try to get a browser context
     try {
-      // @ts-ignore — optional dependency
       const pw = await import('playwright')
       this.browser = await pw.chromium.launch({ headless: true })
     } catch {

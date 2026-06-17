@@ -1664,7 +1664,7 @@ function buildTargetSetupCapabilities(options: {
       title: targetText(lang, 'npx 可视化安装入口', 'npx visual installer'),
       category: 'runtime',
       status: medscalePackageReady ? 'partial' : 'planned',
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         '本地可视化 setup 入口已经可用；公开 npx 体验仍需要首次发布。',
@@ -1683,7 +1683,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'gbrain',
       category: 'memory',
       status: gbrainCommand && memoryCard?.state === 'pass' ? 'ready' : setupStatusFromRuntimeState(memoryCard),
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         '默认外部记忆供应商，用于跨会话医学证据召回；缺失时不阻断本地医学工作流。',
@@ -1702,7 +1702,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'agentmemory',
       category: 'memory',
       status: agentmemory?.includes('enabled') ? 'partial' : 'missing',
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         '第二记忆供应商槽位已在规划内，但当前工作区没有启用为医学记忆路由。',
@@ -1713,7 +1713,7 @@ function buildTargetSetupCapabilities(options: {
       installUnix: 'npx -y @agentmemory/agentmemory --help',
       verifyWindows: 'npm run medscale -- setup --json',
       verifyUnix: 'npm run medscale -- setup --json',
-      nextAction: targetText(lang, '先以 gbrain 为主，agentmemory 作为团队共享记忆的可选后备。', 'Keep gbrain primary and use agentmemory later as an optional shared-memory fallback.'),
+      nextAction: targetText(lang, '先以 gbrain 为主，agentmemory 作为团队共享记忆的必需后备。', 'Keep gbrain primary and use agentmemory as a required shared-memory fallback.'),
       platform,
     }),
     setupCapability({
@@ -1721,7 +1721,7 @@ function buildTargetSetupCapabilities(options: {
       title: targetText(lang, 'Memory Brain 审核流', 'Memory Brain review flow'),
       category: 'memory',
       status: 'ready',
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         'memory seed、learning candidate、approve/reject/stale/restore 已有原生审核状态和审计记录。',
@@ -1740,7 +1740,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'RTK',
       category: 'runtime',
       status: rtkPath ? 'ready' : 'missing',
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         'RTK 可作为命令包装、压缩和外部工具治理层，但不再是 MedSCALE 医学工作流的必需运行时。',
@@ -1759,7 +1759,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'CodeGraph',
       category: 'code-map',
       status: codegraphCommand === 'found' && codegraphDb === 'present' ? 'ready' : (codegraphCommand === 'found' || codegraphDb === 'present' ? 'partial' : 'missing'),
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         '代码地图能力用于医生/研究者视角的实现追踪；缺失时可退回 manifest 和文件证据。',
@@ -1778,7 +1778,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'Graphify',
       category: 'knowledge',
       status: graphifyCommand === 'found' && graphifyManifest === 'present' ? 'ready' : (graphifyCommand === 'found' || graphifyManifest === 'present' ? 'partial' : 'missing'),
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         '知识图谱能力可增强医学证据、代码和交付物之间的关系追踪。',
@@ -1797,7 +1797,7 @@ function buildTargetSetupCapabilities(options: {
       title: targetText(lang, '医学专用 skills', 'Medical skills'),
       category: 'skills',
       status: setupStatusFromRuntimeState(skillsCard),
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         skillsCard?.state === 'pass'
@@ -1828,7 +1828,7 @@ function buildTargetSetupCapabilities(options: {
       title: targetText(lang, 'MedSCALE MCP server map', 'MedSCALE MCP server map'),
       category: 'mcp',
       status: setupStatusFromRuntimeState(mcpCard),
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         mcpCard?.state === 'pass'
@@ -1859,7 +1859,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'PubMed / OpenAlex',
       category: 'medical-evidence',
       status: setupStatusFromRuntimeState(retrievalCard),
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         '医学检索客户端已经存在，但尚未进入 native doctor 深度检查和首页能力图。',
@@ -1881,7 +1881,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'Package audit',
       category: 'audit',
       status: setupStatusFromRuntimeState(packageAuditCard),
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         '交付包审计已有打包器基础；还需要在 native doctor 和首页中显示更细的审计结果。',
@@ -1900,7 +1900,7 @@ function buildTargetSetupCapabilities(options: {
       title: targetText(lang, '图表引用检查', 'Figure reference checks'),
       category: 'audit',
       status: setupStatusFromRuntimeState(figureRefsCard),
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         '交付包能收集 figures，但图表编号、正文引用、期刊格式检查还没有成为独立门禁。',
@@ -1919,7 +1919,7 @@ function buildTargetSetupCapabilities(options: {
       title: targetText(lang, 'Token / cost 面板', 'Token / cost panel'),
       category: 'economics',
       status: tokenCostReport.summary.totalRecords > 0 ? 'ready' : 'partial',
-      required: false,
+      required: true,
       summary: targetText(
         lang,
         tokenCostReport.summary.totalRecords > 0
@@ -1959,7 +1959,7 @@ function buildTargetSetupCapabilities(options: {
       installUnix: 'cd target-research-platform && python -m pip install -r requirements.txt',
       verifyWindows: 'cd target-research-platform && python -m pytest',
       verifyUnix: 'cd target-research-platform && python -m pytest',
-      nextAction: targetText(lang, '保持它作为唯一必需运行时，外部能力走增强层。', 'Keep it as the only required runtime and place external capabilities in the enhancement layer.'),
+      nextAction: targetText(lang, '保持 core 运行时，外部能力走增强层必须一起安装。', 'Keep core runtime and ensure external capabilities in the enhancement layer are also installed.'),
       platform,
     }),
   ]

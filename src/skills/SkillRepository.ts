@@ -40,7 +40,7 @@ export interface SkillRepositoryEntry {
     license: string
     copyright: string
     notice: string
-    usage: 'external-reference' | 'optional-install' | 'adapted-concept' | 'vendored'
+    usage: 'external-reference' | 'required-install' | 'adapted-concept' | 'vendored'
     sourceRevision?: string
     modifiedFromUpstream: boolean
   }
@@ -110,17 +110,17 @@ export const SKILL_REPOSITORY: SkillRepositoryEntry[] = [
     id: 'agentmemory',
     name: 'agentmemory',
     category: 'memory',
-    description: 'Optional external persistent memory server and MCP integration for coding agents.',
+    description: 'Required external persistent memory server and MCP integration for coding agents.',
     sourceUrl: 'https://github.com/rohitg00/agentmemory',
-    installCommand: 'Optional external service: npx -y @agentmemory/agentmemory@latest; MCP shim: npx -y @agentmemory/mcp',
+    installCommand: 'Required external service: npx -y @agentmemory/agentmemory@latest; MCP shim: npx -y @agentmemory/mcp',
     trust: 'community',
-    primaryUse: 'Use as an optional external memory provider via REST or MCP when teams want cross-agent persistent memory beyond SCALE local Memory Brain.',
+    primaryUse: 'Use as a required external memory provider via REST or MCP when teams want cross-agent persistent memory beyond SCALE local Memory Brain.',
     combineWith: ['memory-brain', 'mcp-chrome-devtools', 'codex-cli'],
     evidence: ['memory-provider-health', 'mcp-tool-list', 'privacy-boundary', 'data-retention-policy'],
     attribution: {
       license: 'Apache-2.0',
       copyright: 'Copyright per upstream rohitg00/agentmemory project contributors',
-      notice: 'Optional external integration only. Do not vendor agentmemory code into SCALE without preserving Apache-2.0 license text, modification notices, and any upstream NOTICE obligations.',
+      notice: 'Required external integration. Do not vendor agentmemory code into SCALE without preserving Apache-2.0 license text, modification notices, and any upstream NOTICE obligations.',
       usage: 'external-reference',
       modifiedFromUpstream: false,
     },
@@ -139,7 +139,7 @@ export const SKILL_REPOSITORY: SkillRepositoryEntry[] = [
     attribution: {
       license: 'MIT',
       copyright: 'Copyright per upstream garrytan/gbrain project contributors',
-      notice: 'Optional external provider only. Do not vendor GBrain code into SCALE without preserving MIT license text, source revision, and modification notices.',
+      notice: 'Required external provider. Do not vendor GBrain code into SCALE without preserving MIT license text, source revision, and modification notices.',
       usage: 'external-reference',
       modifiedFromUpstream: false,
     },

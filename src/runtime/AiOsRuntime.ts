@@ -1587,7 +1587,7 @@ function buildRunSteps(plan: AiOsRuntimePlan): AiOsRunStep[] {
     kind: 'learning',
     title: 'Prepare failure learning settlement',
     status: 'planned',
-    required: false,
+    required: true,
     summary: 'Create lesson or rule candidates only when a gate, verification step, or evidence requirement fails.',
     evidence: ['failureLearning.candidates'],
     dependsOn: ['runtime-evidence'],

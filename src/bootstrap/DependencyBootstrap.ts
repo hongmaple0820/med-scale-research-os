@@ -366,7 +366,7 @@ function buildReport(
   if (summary.manualReview > 0) recommendations.push('Review manual-review items for missing package managers, PATH setup, or platform-specific configuration.')
   if (summary.needsInit > 0) recommendations.push('Run the listed initialization commands before treating installed CLIs as ready for autonomous use.')
   if (summary.versionDrift > 0) recommendations.push('Resolve version-drift items before relying on their generated skills, hooks, or artifacts.')
-  if (items.some(item => item.id === 'frontend-design')) recommendations.push('frontend-design is optional; keep it as an explicit companion only when implementation ideation is needed.')
+  if (items.some(item => item.id === 'frontend-design')) recommendations.push('frontend-design is a required companion for implementation ideation and UI polish.')
   if (items.some(item => item.id === 'awesome-design-md')) recommendations.push('Use awesome-design-md as the source of DESIGN.md, brand direction, and visual-language selection.')
   if (items.some(item => item.id === 'ui-ux-pro-max')) recommendations.push('Use ui-ux-pro-max for UX flow, UI state, accessibility, and responsive acceptance checks.')
   if (items.some(item => item.id === 'gbrain')) recommendations.push('After GBrain is installed, validate remote or thin-client health with `scale memory provider status --json`.')

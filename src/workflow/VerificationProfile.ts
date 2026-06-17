@@ -23,7 +23,7 @@ export interface VerificationProfileEntry {
 
 export interface VerificationPolicy {
   mode?: string
-  optionalToolsWarnOnly?: boolean
+  requiredToolsWarnOnly?: boolean
   artifactGate?: VerificationArtifactGateMode
   artifactGateLevels?: VerificationArtifactGateLevel[]
   engineeringStandardsGate?: VerificationEngineeringStandardsGateMode
@@ -65,7 +65,7 @@ export interface ResolvedVerificationTargets {
 }
 
 export const DEFAULT_VERIFICATION_POLICY: VerificationPolicy = {
-  optionalToolsWarnOnly: true,
+  requiredToolsWarnOnly: false,
   artifactGate: 'warn',
   artifactGateLevels: ['M', 'L', 'CRITICAL'],
   engineeringStandardsGate: 'block',
@@ -206,7 +206,6 @@ function selectServiceNames(
   if (requested.includes('all')) {
     if (profile?.services?.length) return profile.services
     return (matrix.services ?? [])
-      .filter(service => service.required !== false)
       .map(service => service.name)
   }
   if (requested.length > 0) return requested

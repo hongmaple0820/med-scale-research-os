@@ -1155,20 +1155,20 @@ function verificationMatrixTemplate(
     profiles: {
       default: {
         commands: {},
-        services: options.services?.filter(service => service.required !== false).map(service => service.name) ?? [],
+        services: options.services?.map(service => service.name) ?? [],
       },
       productSmoke: {
         commands: {
           smoke: 'powershell -ExecutionPolicy Bypass -File scripts/qa/product-smoke.ps1',
         },
-        services: options.services?.filter(service => service.required !== false).map(service => service.name) ?? [],
+        services: options.services?.map(service => service.name) ?? [],
       },
     },
     services: options.services ?? [],
     exclude: options.exclude ?? ['node_modules', 'dist', 'tmp', 'vendor'],
     policy: {
       mode,
-      optionalToolsWarnOnly: true,
+      requiredToolsWarnOnly: false,
       artifactGate: options.artifactGate ?? (mode === 'critical' ? 'block' : 'warn'),
       artifactGateLevels: ['M', 'L', 'CRITICAL'],
       engineeringStandardsGate: mode === 'minimal' ? 'warn' : 'block',

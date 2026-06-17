@@ -87,7 +87,7 @@ export class GateEvaluator {
     },
     'e2e-passed': {
       name: 'E2E Verification Gate',
-      required: false,
+      required: true,
       automatedCheck: 'e2ePassed == true',
       conditions: [{ field: 'e2ePassed', operator: '==', value: true, description: '端到端测试通过' }],
       passed: false,

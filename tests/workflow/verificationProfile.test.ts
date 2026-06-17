@@ -82,7 +82,7 @@ describe('resolveVerificationProfile', () => {
       services: [
         { name: 'api', path: 'services/api', required: true },
         { name: 'worker', path: 'services/worker', required: true },
-        { name: 'docs', path: 'docs', required: false },
+        { name: 'docs', path: 'docs', required: true },
       ],
       policy: {
         artifactGate: 'block',
@@ -93,10 +93,11 @@ describe('resolveVerificationProfile', () => {
     const resolved = resolveVerificationTargets({ projectDir: dir, service: 'all' })
 
     expect(resolved.profileName).toBe('default')
-    expect(resolved.targets.map(target => target.service?.name)).toEqual(['api', 'worker'])
+    expect(resolved.targets.map(target => target.service?.name)).toEqual(['api', 'worker', 'docs'])
     expect(resolved.targets.map(target => target.config.cwd)).toEqual([
       join(dir, 'services', 'api'),
       join(dir, 'services', 'worker'),
+      join(dir, 'docs'),
     ])
     expect(resolved.targets.every(target => target.config.test === 'npm test')).toBe(true)
     expect(resolved.policy).toMatchObject({

@@ -76,7 +76,7 @@ const LIGHT_DOCS: WorkflowTemplate = {
       type: 'verify',
       name: 'Verify',
       description: 'Check links, formatting, and accuracy',
-      required: false,
+      required: true,
       riskLevel: 'low',
       estimatedDuration: '5min',
       evidenceRequired: [],
@@ -144,7 +144,7 @@ const STANDARD_CODE: WorkflowTemplate = {
       type: 'review',
       name: 'Review',
       description: 'Code review for quality and security',
-      required: false,
+      required: true,
       riskLevel: 'medium',
       estimatedDuration: '10min',
       evidenceRequired: [],
@@ -223,7 +223,7 @@ const STRICT_FEATURE: WorkflowTemplate = {
       type: 'ship',
       name: 'Ship',
       description: 'Ship pipeline with version bump and PR',
-      required: false,
+      required: true,
       riskLevel: 'high',
       estimatedDuration: '10min',
       evidenceRequired: ['ship-report'],
@@ -400,7 +400,7 @@ export function formatTemplateForAgent(template: WorkflowTemplate): string {
   ]
 
   for (const step of template.steps) {
-    const required = step.required ? '*(required)*' : '*(optional)*'
+    const required = step.required ? '*(required)*' : '*'
     lines.push(`### ${step.name} ${required}`)
     lines.push(`- **Type:** ${step.type}`)
     lines.push(`- **Risk:** ${step.riskLevel}`)

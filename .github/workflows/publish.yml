@@ -98,7 +98,20 @@ jobs:
         run: npm audit --omit=dev --registry=https://registry.npmjs.org
 
       - name: Publish dry run
+        if: steps.npm_status.outputs.published != 'true'
         run: npm publish --dry-run --json --registry=https://registry.npmjs.org > medscale-publish-dry-run.json
+
+      - name: Record existing publish evidence
+        if: steps.npm_status.outputs.published == 'true'
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+          writeFileSync('medscale-publish-dry-run.json', JSON.stringify({
+            package: '${{ steps.meta.outputs.package }}',
+            version: '${{ steps.meta.outputs.version }}',
+            alreadyPublished: true,
+          }, null, 2))
+          NODE
 
       - name: Pack dry run for package contents
         run: npm pack --dry-run --json --registry=https://registry.npmjs.org > medscale-pack-dry-run.json

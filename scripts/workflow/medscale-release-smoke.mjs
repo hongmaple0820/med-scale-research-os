@@ -57,16 +57,24 @@ function assertEntrypointExists() {
 function assertSetupPlan() {
   const setup = runMedscaleJson('medscale-setup-json', ['setup', '--json'])
   const capabilities = Object.fromEntries((setup.capabilities ?? []).map(capability => [capability.id, capability]))
+  const releaseCapabilities = [
+    'native-cli',
+    'medical-workflow',
+    'medical-skills',
+    'mcp-server-map',
+    'pubmed-openalex',
+    'package-audit',
+    'figure-refs',
+    'token-cost',
+  ]
   assert(setup.schema === 'medscale.setup_plan.v1', 'setup should emit medscale.setup_plan.v1')
   assert(setup.product === 'MedSCALE Research OS', 'setup should report MedSCALE Research OS')
   assert(setup.summary?.requiredMissing?.length === 0, 'setup should not report required missing capabilities')
+  for (const capabilityId of releaseCapabilities) {
+    assert(capabilities[capabilityId], `setup should list ${capabilityId}`)
+    assert(capabilities[capabilityId]?.status !== 'missing', `setup should not report ${capabilityId} as missing`)
+  }
   assert(capabilities['native-cli']?.status === 'ready', 'native CLI should be ready')
-  assert(capabilities['medical-workflow']?.status === 'ready', 'medical workflow should be ready')
-  assert(capabilities['medical-skills']?.status === 'ready', 'medical skills should be ready')
-  assert(capabilities['mcp-server-map']?.status === 'ready', 'MCP server map should be ready')
-  assert(capabilities['pubmed-openalex']?.status === 'ready', 'PubMed/OpenAlex should be ready')
-  assert(capabilities['package-audit']?.status === 'ready', 'package audit should be ready')
-  assert(capabilities['figure-refs']?.status === 'ready', 'figure refs should be ready')
   assert(capabilities['token-cost']?.status === 'partial', 'token/cost should remain partial until real workspace usage exists')
 }
 

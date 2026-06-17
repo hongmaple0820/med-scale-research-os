@@ -193,7 +193,7 @@ jobs:
           if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
             printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
           fi
-          npm access public "${{ steps.meta.outputs.package }}" --registry=https://registry.npmjs.org
+          npm access set status=public "${{ steps.meta.outputs.package }}" --registry=https://registry.npmjs.org
 
       - name: Verify published npx entrypoint
         if: github.event_name == 'push' || inputs.publish == true

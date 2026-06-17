@@ -57,6 +57,7 @@ jobs:
         id: meta
         shell: bash
         run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
@@ -66,8 +67,29 @@ jobs:
               exit 1
             fi
           fi
+          echo "package=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Check npm published version
+        id: npm_status
+        if: github.event_name == 'push' || inputs.publish == true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
+          fi
+          PACKAGE="${{ steps.meta.outputs.package }}"
+          VERSION="${{ steps.meta.outputs.version }}"
+          if npm view "${PACKAGE}@${VERSION}" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "${PACKAGE}@${VERSION} is already published."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "${PACKAGE}@${VERSION} is not published yet."
+          fi
 
       - name: Verify MedSCALE release gate
         run: npm run release:medscale
@@ -128,7 +150,7 @@ jobs:
           retention-days: 30
 
       - name: Publish to npm
-        if: github.event_name == 'push' || inputs.publish == true
+        if: (github.event_name == 'push' || inputs.publish == true) && steps.npm_status.outputs.published != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -150,12 +172,28 @@ jobs:
           fi
           npm publish "${PUBLISH_ARGS[@]}"
 
+      - name: Ensure npm package is public
+        if: github.event_name == 'push' || inputs.publish == true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
+          fi
+          npm access public "${{ steps.meta.outputs.package }}" --registry=https://registry.npmjs.org
+
       - name: Verify published npx entrypoint
         if: github.event_name == 'push' || inputs.publish == true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > ~/.npmrc
+          fi
           VERSION="${{ steps.meta.outputs.version }}"
-          npx -y @hongmaple0820/med-scale-research-os@${VERSION} setup --json
-          npx -y @hongmaple0820/med-scale-research-os@${VERSION} doctor --json
+          PACKAGE="${{ steps.meta.outputs.package }}"
+          npm exec --yes --package="${PACKAGE}@${VERSION}" -- medscale setup --json
+          npm exec --yes --package="${PACKAGE}@${VERSION}" -- medscale doctor --json
 
       - name: Create GitHub Release
         if: (github.event_name == 'push' || inputs.publish == true) && (github.event_name == 'push' || inputs.create_release == true)

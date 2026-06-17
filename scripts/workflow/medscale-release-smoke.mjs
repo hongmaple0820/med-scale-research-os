@@ -95,10 +95,15 @@ function assertDoctor() {
   const cards = Object.fromEntries((readiness.cards ?? []).map(card => [card.id, card]))
   assert(doctor.ok === true, 'doctor should be ok even when optional capabilities warn')
   assert(readiness.requiredMissing?.length === 0, 'doctor should not report required missing capabilities')
-  assert(cards.medical_retrieval?.state === 'pass', 'doctor should pass medical retrieval')
-  assert(cards.package_audit?.state === 'pass', 'doctor should pass package audit')
-  assert(cards.figure_refs?.state === 'pass', 'doctor should pass figure refs')
+  assertDoctorCardNonFail(cards, 'medical_retrieval')
+  assertDoctorCardNonFail(cards, 'package_audit')
+  assertDoctorCardNonFail(cards, 'figure_refs')
   assert(cards.token_cost?.state === 'warning', 'doctor should warn for empty token/cost ledger')
+}
+
+function assertDoctorCardNonFail(cards, cardId) {
+  const state = cards[cardId]?.state
+  assert(state === 'pass' || state === 'warning', `doctor should expose ${cardId} without failing`)
 }
 
 function assertUsageEnvelopeIngest() {

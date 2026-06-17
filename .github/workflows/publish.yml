@@ -104,7 +104,7 @@ jobs:
       - name: Record existing publish evidence
         if: steps.npm_status.outputs.published == 'true'
         run: |
-          VERIFY_ROOT="$VERIFY_ROOT" node --input-type=module <<'NODE'
+          node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs'
           writeFileSync('medscale-publish-dry-run.json', JSON.stringify({
             package: '${{ steps.meta.outputs.package }}',
@@ -220,7 +220,7 @@ jobs:
             sleep $((attempt * 10))
           done
           npm exec --yes --registry=https://registry.npmjs.org --prefix "$VERIFY_ROOT" --package="${PACKAGE}@${VERSION}" -- medscale doctor --dir "$VERIFY_WORKSPACE" --json > "${VERIFY_ROOT}/doctor.json"
-          node --input-type=module <<'NODE'
+          VERIFY_ROOT="$VERIFY_ROOT" node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
           const setup = JSON.parse(readFileSync(`${process.env.VERIFY_ROOT}/setup-apply.json`, 'utf8'))
           const doctor = JSON.parse(readFileSync(`${process.env.VERIFY_ROOT}/doctor.json`, 'utf8'))

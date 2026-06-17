@@ -1464,7 +1464,6 @@ function shouldCopyMedscaleTemplate(sourcePath: string): boolean {
     '/target-research-platform/provenance_logs/',
     '/__pycache__/',
     '/.git/',
-    '/node_modules/',
   ]
   if (excluded.some(part => normalized.includes(part))) return false
   return !/\.py[cod]$/i.test(normalized)

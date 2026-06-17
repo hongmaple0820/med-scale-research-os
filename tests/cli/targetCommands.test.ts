@@ -401,6 +401,36 @@ describe('targetCommands', () => {
     }
   })
 
+  it('applies bundled platform files when the package is installed under node_modules', () => {
+    const root = mkdtempSync(join(tmpdir(), 'medscale-setup-npx-'))
+    const packageRoot = join(root, 'node_modules', '@hongmaple0820', 'med-scale-research-os')
+    const projectDir = join(root, 'workspace')
+    try {
+      mkdirSync(join(packageRoot, 'target-research-platform', 'src', 'api_clients'), { recursive: true })
+      mkdirSync(join(packageRoot, '.scale'), { recursive: true })
+      mkdirSync(join(packageRoot, 'mcp-configs', 'memory'), { recursive: true })
+      mkdirSync(join(packageRoot, 'docs'), { recursive: true })
+      writeFileSync(join(packageRoot, 'target-research-platform', 'main.py'), 'print("medscale")\n', 'utf-8')
+      writeFileSync(join(packageRoot, 'target-research-platform', 'requirements.txt'), 'pytest\n', 'utf-8')
+      writeFileSync(join(packageRoot, 'target-research-platform', 'src', 'api_clients', 'pubmed_client.py'), '# pubmed\n', 'utf-8')
+      writeFileSync(join(packageRoot, '.scale', 'skills.json'), '{"domains":[]}\n', 'utf-8')
+      writeFileSync(join(packageRoot, '.scale', 'mcp-servers.yaml'), 'servers: []\n', 'utf-8')
+      writeFileSync(join(packageRoot, '.scale', 'verification.json'), '{}\n', 'utf-8')
+      writeFileSync(join(packageRoot, 'mcp-configs', 'memory', 'config.json'), '{}\n', 'utf-8')
+      writeFileSync(join(packageRoot, 'docs', 'README.md'), '# MedSCALE\n', 'utf-8')
+
+      const report = applyTargetSetup({ projectDir, packageRoot, lang: 'en' })
+
+      expect(report.ok).toBe(true)
+      expect(report.missing).toBe(0)
+      expect(existsSync(join(projectDir, 'target-research-platform', 'main.py'))).toBe(true)
+      expect(existsSync(join(projectDir, 'target-research-platform', 'src', 'api_clients', 'pubmed_client.py'))).toBe(true)
+      expect(existsSync(join(projectDir, 'mcp-configs', 'memory', 'config.json'))).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('builds a MedSCALE token/cost report from the model usage ledger', () => {
     const projectDir = mkdtempSync(join(tmpdir(), 'medscale-token-cost-'))
     try {

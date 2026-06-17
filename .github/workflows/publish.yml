@@ -104,7 +104,7 @@ jobs:
       - name: Record existing publish evidence
         if: steps.npm_status.outputs.published == 'true'
         run: |
-          node --input-type=module <<'NODE'
+          VERIFY_ROOT="$VERIFY_ROOT" node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs'
           writeFileSync('medscale-publish-dry-run.json', JSON.stringify({
             package: '${{ steps.meta.outputs.package }}',
@@ -206,9 +206,37 @@ jobs:
           VERSION="${{ steps.meta.outputs.version }}"
           PACKAGE="${{ steps.meta.outputs.package }}"
           VERIFY_ROOT="$(mktemp -d)"
+          VERIFY_WORKSPACE="${VERIFY_ROOT}/workspace"
           trap 'rm -rf "$VERIFY_ROOT"' EXIT
-          npm exec --yes --registry=https://registry.npmjs.org --prefix "$VERIFY_ROOT" --package="${PACKAGE}@${VERSION}" -- medscale setup --json
-          npm exec --yes --registry=https://registry.npmjs.org --prefix "$VERIFY_ROOT" --package="${PACKAGE}@${VERSION}" -- medscale doctor --json
+          mkdir -p "$VERIFY_WORKSPACE"
+          for attempt in 1 2 3 4 5 6; do
+            if npm exec --yes --registry=https://registry.npmjs.org --prefix "$VERIFY_ROOT" --package="${PACKAGE}@${VERSION}" -- medscale setup --dir "$VERIFY_WORKSPACE" --apply --json > "${VERIFY_ROOT}/setup-apply.json"; then
+              break
+            fi
+            if [ "$attempt" = "6" ]; then
+              echo "::error::Published npx setup --apply failed after ${attempt} attempts."
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
+          npm exec --yes --registry=https://registry.npmjs.org --prefix "$VERIFY_ROOT" --package="${PACKAGE}@${VERSION}" -- medscale doctor --dir "$VERIFY_WORKSPACE" --json > "${VERIFY_ROOT}/doctor.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const setup = JSON.parse(readFileSync(`${process.env.VERIFY_ROOT}/setup-apply.json`, 'utf8'))
+          const doctor = JSON.parse(readFileSync(`${process.env.VERIFY_ROOT}/doctor.json`, 'utf8'))
+          const cards = Object.fromEntries((doctor.runtimeReadiness?.cards ?? []).map(card => [card.id, card]))
+          if (setup.applyReport?.ok !== true) {
+            throw new Error('Published setup --apply did not report ok=true')
+          }
+          if ((doctor.runtimeReadiness?.requiredMissing ?? []).length > 0) {
+            throw new Error(`Published doctor still reports required missing capabilities: ${doctor.runtimeReadiness.requiredMissing.join(', ')}`)
+          }
+          for (const id of ['medical_workflow', 'medical_retrieval', 'package_audit']) {
+            if (!cards[id] || cards[id].state === 'fail') {
+              throw new Error(`Published doctor card ${id} is missing or failing`)
+            }
+          }
+          NODE
 
       - name: Create GitHub Release
         if: (github.event_name == 'push' || inputs.publish == true) && (github.event_name == 'push' || inputs.create_release == true)

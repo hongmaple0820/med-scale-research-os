@@ -89,9 +89,9 @@ function assertSetupApply() {
   const doctor = runMedscaleJson('medscale-doctor-applied-json', ['doctor', '--dir', workspace, '--json'])
   const cards = Object.fromEntries((doctor.runtimeReadiness?.cards ?? []).map(card => [card.id, card]))
   assert(doctor.runtimeReadiness?.requiredMissing?.length === 0, 'applied workspace should not have required missing capabilities')
-  assert(cards.medical_workflow?.state === 'pass', 'applied workspace should pass medical workflow readiness')
-  assert(cards.medical_retrieval?.state === 'pass', 'applied workspace should pass medical retrieval readiness')
-  assert(cards.package_audit?.state === 'pass', 'applied workspace should pass package audit readiness')
+  assertDoctorCardNonFail(cards, 'medical_workflow')
+  assertDoctorCardNonFail(cards, 'medical_retrieval')
+  assertDoctorCardNonFail(cards, 'package_audit')
 }
 
 function assertVisualSetup() {

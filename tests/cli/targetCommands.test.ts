@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   buildTargetRuntimeReadiness,
   buildTargetSetupPlan,
   buildTargetTokenCostReport,
+  applyTargetSetup,
   formatStageLabel,
   ingestTargetTokenUsage,
   renderTargetSetupVisualPlan,
@@ -367,6 +368,34 @@ describe('targetCommands', () => {
       expect(visual).toContain('Verify queue')
       expect(visual).toContain('npx -y @hongmaple0820/med-scale-research-os setup --visual --lang en')
       expect(visual).toContain('Tip: setup --visual only displays grouped commands')
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true })
+    }
+  })
+
+  it('applies bundled MedSCALE medical platform files into an empty workspace without overwriting', () => {
+    const projectDir = mkdtempSync(join(tmpdir(), 'medscale-setup-apply-'))
+    try {
+      const first = applyTargetSetup({ projectDir, lang: 'en' })
+
+      expect(first.schema).toBe('medscale.setup_apply.v1')
+      expect(first.ok).toBe(true)
+      expect(first.copied).toBeGreaterThanOrEqual(5)
+      expect(first.missing).toBe(0)
+      expect(existsSync(join(projectDir, 'target-research-platform', 'main.py'))).toBe(true)
+      expect(existsSync(join(projectDir, 'target-research-platform', 'src', 'api_clients', 'pubmed_client.py'))).toBe(true)
+      expect(existsSync(join(projectDir, '.scale', 'skills.json'))).toBe(true)
+      expect(existsSync(join(projectDir, '.scale', 'mcp-servers.yaml'))).toBe(true)
+      expect(existsSync(join(projectDir, 'mcp-configs', 'memory', 'config.json'))).toBe(true)
+      expect(existsSync(join(projectDir, 'target-research-platform', 'output'))).toBe(false)
+
+      const sentinelPath = join(projectDir, '.scale', 'skills.json')
+      writeFileSync(sentinelPath, '{"sentinel":true}\n', 'utf-8')
+      const second = applyTargetSetup({ projectDir, lang: 'en' })
+
+      expect(second.ok).toBe(true)
+      expect(second.skipped).toBeGreaterThan(0)
+      expect(readFileSync(sentinelPath, 'utf-8')).toContain('"sentinel":true')
     } finally {
       rmSync(projectDir, { recursive: true, force: true })
     }

@@ -3,8 +3,9 @@
 
 import { defineCommand } from 'citty'
 import { spawn, spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { PythonBridge } from '../bridge/PythonBridge.js'
 import { STAGE_LABELS, type AnalysisStage } from '../bridge/types.js'
 import { readMedicalWorkflowDashboard } from '../dashboard/MedicalWorkflowData.js'
@@ -28,6 +29,7 @@ import {
 } from '../runtime/ModelUsageLedger.js'
 
 const PROJECT_DIR = process.env.MEDSCALE_PROJECT_DIR ?? process.env.SCALE_PROJECT_DIR ?? process.cwd()
+const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 export interface ResolvedTargetPlatform {
   projectDir: string
@@ -1382,6 +1384,27 @@ export interface TargetSetupPlan {
   notes: string[]
 }
 
+export interface TargetSetupApplyEntry {
+  id: string
+  source: string
+  destination: string
+  status: 'copied' | 'skipped' | 'missing'
+}
+
+export interface TargetSetupApplyReport {
+  schema: 'medscale.setup_apply.v1'
+  ok: boolean
+  product: 'MedSCALE Research OS'
+  workspaceRoot: string
+  packageRoot: string
+  copied: number
+  skipped: number
+  missing: number
+  entries: TargetSetupApplyEntry[]
+  nextCommands: string[]
+  warnings: string[]
+}
+
 function detectSetupPlatform(value?: unknown): TargetSetupPlatform {
   const raw = String(value ?? '').trim().toLowerCase()
   if (raw === 'windows' || raw === 'win' || raw === 'win32') return 'windows'
@@ -1423,6 +1446,118 @@ function readTextIfPresent(path: string): string {
     return existsSync(path) ? readFileSync(path, 'utf-8') : ''
   } catch {
     return ''
+  }
+}
+
+function shouldCopyMedscaleTemplate(sourcePath: string): boolean {
+  const normalized = sourcePath.replace(/\\/g, '/')
+  const excluded = [
+    '/target-research-platform/output',
+    '/target-research-platform/output/',
+    '/target-research-platform/cache',
+    '/target-research-platform/cache/',
+    '/target-research-platform/.pytest_cache',
+    '/target-research-platform/.pytest_cache/',
+    '/target-research-platform/.tmp-pytest',
+    '/target-research-platform/.tmp-pytest/',
+    '/target-research-platform/provenance_logs',
+    '/target-research-platform/provenance_logs/',
+    '/__pycache__/',
+    '/.git/',
+    '/node_modules/',
+  ]
+  if (excluded.some(part => normalized.includes(part))) return false
+  return !/\.py[cod]$/i.test(normalized)
+}
+
+function copySetupEntry(options: {
+  id: string
+  source: string
+  destination: string
+}): TargetSetupApplyEntry {
+  const source = resolve(options.source)
+  const destination = resolve(options.destination)
+  if (!existsSync(source)) {
+    return { id: options.id, source, destination, status: 'missing' }
+  }
+  if (existsSync(destination)) {
+    return { id: options.id, source, destination, status: 'skipped' }
+  }
+  mkdirSync(dirname(destination), { recursive: true })
+  cpSync(source, destination, {
+    recursive: true,
+    errorOnExist: false,
+    force: false,
+    filter: shouldCopyMedscaleTemplate,
+  })
+  return { id: options.id, source, destination, status: 'copied' }
+}
+
+export function applyTargetSetup(options: {
+  projectDir: string
+  packageRoot?: string
+  lang?: unknown
+}): TargetSetupApplyReport {
+  const workspaceRoot = resolve(options.projectDir)
+  const packageRoot = resolve(options.packageRoot ?? PACKAGE_ROOT)
+  const lang = normalizeLanguage(options.lang)
+  mkdirSync(workspaceRoot, { recursive: true })
+
+  const entries = [
+    copySetupEntry({
+      id: 'target-research-platform',
+      source: join(packageRoot, 'target-research-platform'),
+      destination: join(workspaceRoot, 'target-research-platform'),
+    }),
+    copySetupEntry({
+      id: 'scale-skills',
+      source: join(packageRoot, '.scale', 'skills.json'),
+      destination: join(workspaceRoot, '.scale', 'skills.json'),
+    }),
+    copySetupEntry({
+      id: 'scale-mcp-servers',
+      source: join(packageRoot, '.scale', 'mcp-servers.yaml'),
+      destination: join(workspaceRoot, '.scale', 'mcp-servers.yaml'),
+    }),
+    copySetupEntry({
+      id: 'scale-verification',
+      source: join(packageRoot, '.scale', 'verification.json'),
+      destination: join(workspaceRoot, '.scale', 'verification.json'),
+    }),
+    copySetupEntry({
+      id: 'mcp-configs',
+      source: join(packageRoot, 'mcp-configs'),
+      destination: join(workspaceRoot, 'mcp-configs'),
+    }),
+    copySetupEntry({
+      id: 'medscale-docs',
+      source: join(packageRoot, 'docs'),
+      destination: join(workspaceRoot, 'docs'),
+    }),
+  ]
+  const copied = entries.filter(entry => entry.status === 'copied').length
+  const skipped = entries.filter(entry => entry.status === 'skipped').length
+  const missing = entries.filter(entry => entry.status === 'missing').length
+  const warnings = entries
+    .filter(entry => entry.status === 'missing')
+    .map(entry => targetText(lang, `初始化源缺失: ${entry.id}`, `Missing setup source: ${entry.id}`))
+
+  return {
+    schema: 'medscale.setup_apply.v1',
+    ok: missing === 0,
+    product: 'MedSCALE Research OS',
+    workspaceRoot,
+    packageRoot,
+    copied,
+    skipped,
+    missing,
+    entries,
+    nextCommands: [
+      `medscale doctor --dir "${workspaceRoot}" --json`,
+      `medscale setup --dir "${workspaceRoot}" --visual --lang ${lang}`,
+      `cd "${join(workspaceRoot, 'target-research-platform')}" && python -m pip install -r requirements.txt`,
+    ],
+    warnings,
   }
 }
 
@@ -3482,7 +3617,7 @@ export const targetTokenCommand = defineCommand({
 export const targetSetupCommand = defineCommand({
   meta: {
     name: 'setup',
-    description: 'Plan MedSCALE Research OS third-party capabilities and install checks',
+    description: 'Plan or initialize MedSCALE Research OS third-party capabilities and medical platform checks',
   },
   args: {
     dir: { type: 'string', default: PROJECT_DIR, description: 'Project root directory' },
@@ -3490,11 +3625,13 @@ export const targetSetupCommand = defineCommand({
     platform: { type: 'string', default: undefined, description: 'Target platform: windows, macos, or linux' },
     json: { type: 'boolean', default: false, description: 'Output machine-readable JSON' },
     visual: { type: 'boolean', default: false, description: 'Show the researcher-facing visual setup plan' },
-    apply: { type: 'boolean', default: false, description: 'Reserved for future guided installation; currently plan-only' },
+    apply: { type: 'boolean', default: false, description: 'Initialize bundled MedSCALE medical platform files without overwriting existing files' },
   },
   async run({ args }) {
+    const projectDir = String(args.dir ?? PROJECT_DIR)
+    const applyReport = args.apply ? applyTargetSetup({ projectDir, lang: args.lang }) : null
     const plan = buildTargetSetupPlan({
-      projectDir: String(args.dir ?? PROJECT_DIR),
+      projectDir,
       lang: args.lang,
       platform: args.platform,
     })
@@ -3508,17 +3645,33 @@ export const targetSetupCommand = defineCommand({
         : 'setup is currently plan-only; run each install/verify command explicitly.',
     }
 
+    ;(payload as Record<string, unknown>).applyAvailable = true
+    ;(payload as Record<string, unknown>).applyReport = applyReport
+    ;(payload as Record<string, unknown>).applyMessage = args.apply
+      ? (applyReport?.ok
+        ? targetText(plan.lang, 'MedSCALE Research OS 初始化完成；下一步运行 doctor 和医学研究命令。', 'MedSCALE Research OS initialization completed; run doctor and medical research commands next.')
+        : targetText(plan.lang, 'MedSCALE Research OS 初始化未完全完成；请查看 applyReport.warnings。', 'MedSCALE Research OS initialization did not fully complete; inspect applyReport.warnings.'))
+      : targetText(
+        plan.lang,
+        'setup 默认只展示计划；需要初始化当前工作区时运行 medscale setup --apply --lang zh。',
+        'setup shows the plan by default; run medscale setup --apply --lang en to initialize this workspace.',
+      )
+
     if (args.json) {
       console.log(JSON.stringify(payload, null, 2))
-      process.exit(plan.status === 'blocked' ? 1 : 0)
+      process.exit(plan.status === 'blocked' || applyReport?.ok === false ? 1 : 0)
     }
 
     console.log(args.visual ? renderTargetSetupVisualPlan(plan) : renderTargetSetupPlan(plan))
     if (args.apply) {
       console.log('')
       console.log(payload.applyMessage)
+      if (applyReport) {
+        console.log(`  copied=${applyReport.copied} skipped=${applyReport.skipped} missing=${applyReport.missing}`)
+        for (const command of applyReport.nextCommands) console.log(`  next: ${command}`)
+      }
     }
-    process.exit(plan.status === 'blocked' ? 1 : 0)
+    process.exit(plan.status === 'blocked' || applyReport?.ok === false ? 1 : 0)
   },
 })
 

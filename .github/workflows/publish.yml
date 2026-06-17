@@ -205,8 +205,10 @@ jobs:
           fi
           VERSION="${{ steps.meta.outputs.version }}"
           PACKAGE="${{ steps.meta.outputs.package }}"
-          npm exec --yes --package="${PACKAGE}@${VERSION}" -- medscale setup --json
-          npm exec --yes --package="${PACKAGE}@${VERSION}" -- medscale doctor --json
+          VERIFY_ROOT="$(mktemp -d)"
+          trap 'rm -rf "$VERIFY_ROOT"' EXIT
+          npm exec --yes --registry=https://registry.npmjs.org --prefix "$VERIFY_ROOT" --package="${PACKAGE}@${VERSION}" -- medscale setup --json
+          npm exec --yes --registry=https://registry.npmjs.org --prefix "$VERIFY_ROOT" --package="${PACKAGE}@${VERSION}" -- medscale doctor --json
 
       - name: Create GitHub Release
         if: (github.event_name == 'push' || inputs.publish == true) && (github.event_name == 'push' || inputs.create_release == true)

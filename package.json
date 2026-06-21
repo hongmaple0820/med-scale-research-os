@@ -25,6 +25,7 @@
   "files": [
     "dist",
     "target-research-platform/main.py",
+    "target-research-platform/README.md",
     "target-research-platform/bridge_runner.py",
     "target-research-platform/run_dashboard.py",
     "target-research-platform/run_real_medical_workflow.py",
@@ -68,7 +69,7 @@
     "smoke:providers": "node scripts/workflow/provider-rehearsal.mjs",
     "smoke:gbrain": "node scripts/workflow/provider-rehearsal.mjs --skip-graphify --require-gbrain",
     "smoke:graphify": "node scripts/workflow/provider-rehearsal.mjs --skip-gbrain --require-graphify",
-    "release:check": "npm run typecheck && npm run lint && npm test && npm run smoke:setup && npm run smoke:providers -- --write-report && npm run smoke:medscale-release && npm audit --omit=dev && git diff --check && npm pack --dry-run",
+    "release:check": "npm run typecheck && npm run lint && npm run build && npm test && npm run smoke:setup && npm run smoke:providers -- --write-report && npm run smoke:medscale-release && npm audit --omit=dev --registry=https://registry.npmjs.org && git diff --check && npm pack --dry-run",
     "release:medscale": "npm run typecheck && npm test -- tests/cli/targetCommands.test.ts tests/cli/medscaleCli.test.ts tests/memory/MemoryReview.test.ts && npm run smoke:medscale-release",
     "mcp": "node dist/api/mcp.js",
     "serve": "node dist/api/http.js"

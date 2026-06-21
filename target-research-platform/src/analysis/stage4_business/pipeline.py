@@ -105,6 +105,11 @@ class Stage4Pipeline:
 
         # 生成摘要
         results["summary"] = self._generate_summary(results)
+        results["success"] = bool(
+            milestone_result.get("success")
+            and business_plan_result.get("success")
+            and results["stages"].get("markdown_report", {}).get("success")
+        )
 
         # 保存结果
         self._save_results(target_name, disease, results)

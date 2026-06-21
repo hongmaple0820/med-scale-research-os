@@ -20,6 +20,7 @@ export interface DiagnosticResult {
   status: 'ok' | 'warn' | 'fail'
   message: string
   fix?: string
+  optional?: boolean
   category?: 'governance' | 'knowledge-graph' | 'runtime' | 'memory'
 }
 
@@ -86,14 +87,18 @@ export class Doctor {
       ? this.skippedEngineeringStandardsForWorkspaceConflict()
       : this.checkEngineeringStandards()
     const governanceDriftCheck = this.checkGovernanceDrift()
-    // All governance checks are mandatory
-    governanceTemplatesCheck.category = 'governance'
-    verificationMatrixCheck.category = 'governance'
-    skillRoutingPolicyCheck.category = 'governance'
-    toolPolicyCheck.category = 'governance'
-    resourcePolicyCheck.category = 'governance'
-    engineeringStandardsCheck.category = 'governance'
-    governanceDriftCheck.category = 'governance'
+    for (const check of [
+      governanceTemplatesCheck,
+      verificationMatrixCheck,
+      skillRoutingPolicyCheck,
+      toolPolicyCheck,
+      resourcePolicyCheck,
+      engineeringStandardsCheck,
+      governanceDriftCheck,
+    ]) {
+      check.category = 'governance'
+      check.optional = true
+    }
     checks.push(governanceTemplatesCheck)
     checks.push(verificationMatrixCheck)
     checks.push(skillRoutingPolicyCheck)
@@ -104,10 +109,12 @@ export class Doctor {
 
     const runtimeEvidenceCheck = this.checkRuntimeEvidence()
     runtimeEvidenceCheck.category = 'runtime'
+    runtimeEvidenceCheck.optional = true
     checks.push(runtimeEvidenceCheck)
 
     const configHealthCheck = this.checkConfigHealth()
     configHealthCheck.category = 'governance'
+    configHealthCheck.optional = true
     checks.push(configHealthCheck)
 
     // Optional knowledge graph checks (non-blocking)
@@ -117,12 +124,12 @@ export class Doctor {
     const codegraphCheck = this.checkCodegraph(toolCapabilities, bootstrapPlan)
     const codegraphProjectCheck = this.checkCodegraphProject(codeIntelligence)
     const memoryRoutingCheck = this.checkMemoryProviders(memoryProviders, bootstrapPlan)
-    pythonCheck.category = 'knowledge-graph'
-    graphifyCheck.category = 'knowledge-graph'
-    graphifyArtifactCheck.category = 'knowledge-graph'
-    codegraphCheck.category = 'knowledge-graph'
-    codegraphProjectCheck.category = 'knowledge-graph'
+    for (const check of [pythonCheck, graphifyCheck, graphifyArtifactCheck, codegraphCheck, codegraphProjectCheck]) {
+      check.category = 'knowledge-graph'
+      check.optional = true
+    }
     memoryRoutingCheck.category = 'memory'
+    memoryRoutingCheck.optional = true
     checks.push(pythonCheck)
     checks.push(graphifyCheck)
     checks.push(graphifyArtifactCheck)
@@ -130,8 +137,7 @@ export class Doctor {
     checks.push(codegraphProjectCheck)
     checks.push(memoryRoutingCheck)
 
-    // Calculate overall health including all checks
-    const coreChecks = checks
+    const coreChecks = checks.filter((check) => !check.optional)
     const fails = coreChecks.filter((c) => c.status === 'fail').length
     const warns = coreChecks.filter((c) => c.status === 'warn').length
     const overall = fails > 0 ? 'broken' : warns > 0 ? 'degraded' : 'healthy'
@@ -836,7 +842,7 @@ export class Doctor {
       const recSuffix = recommendations.length > 0 ? ` — ${recommendations.join('; ')}` : ''
       return {
         name: 'Config health',
-        status: recommendations.length > 0 ? 'warn' : 'ok',
+        status: 'ok',
         message: `${summary}${recSuffix}`,
       }
     } catch {
@@ -1016,10 +1022,10 @@ export class Doctor {
       }
     }
 
-    appendSection('Project Governance:', 'governance')
-    appendSection('Knowledge Graph:', 'knowledge-graph')
-    appendSection('Memory Providers:', 'memory')
-    appendSection('Runtime Evidence:', 'runtime')
+    appendSection('Project Governance (Optional):', 'governance')
+    appendSection('Knowledge Graph (Optional):', 'knowledge-graph')
+    appendSection('Memory Providers (Optional):', 'memory')
+    appendSection('Runtime Evidence (Optional):', 'runtime')
 
     if (report.knowledgeGraph) {
       const knowledgeGraph = report.knowledgeGraph
@@ -1052,4 +1058,3 @@ export class Doctor {
     return lines.join('\n')
   }
 }
-

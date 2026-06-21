@@ -1683,7 +1683,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'gbrain',
       category: 'memory',
       status: gbrainCommand && memoryCard?.state === 'pass' ? 'ready' : setupStatusFromRuntimeState(memoryCard),
-      required: true,
+      required: false,
       summary: targetText(
         lang,
         '默认外部记忆供应商，用于跨会话医学证据召回；缺失时不阻断本地医学工作流。',
@@ -1702,7 +1702,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'agentmemory',
       category: 'memory',
       status: agentmemory?.includes('enabled') ? 'partial' : 'missing',
-      required: true,
+      required: false,
       summary: targetText(
         lang,
         '第二记忆供应商槽位已在规划内，但当前工作区没有启用为医学记忆路由。',
@@ -1713,7 +1713,7 @@ function buildTargetSetupCapabilities(options: {
       installUnix: 'npx -y @agentmemory/agentmemory --help',
       verifyWindows: 'npm run medscale -- setup --json',
       verifyUnix: 'npm run medscale -- setup --json',
-      nextAction: targetText(lang, '先以 gbrain 为主，agentmemory 作为团队共享记忆的必需后备。', 'Keep gbrain primary and use agentmemory as a required shared-memory fallback.'),
+      nextAction: targetText(lang, '先以 gbrain 为主，agentmemory 作为团队共享记忆的增强后备。', 'Keep gbrain primary and use agentmemory as an optional shared-memory fallback.'),
       platform,
     }),
     setupCapability({
@@ -1740,7 +1740,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'RTK',
       category: 'runtime',
       status: rtkPath ? 'ready' : 'missing',
-      required: true,
+      required: false,
       summary: targetText(
         lang,
         'RTK 可作为命令包装、压缩和外部工具治理层，但不再是 MedSCALE 医学工作流的必需运行时。',
@@ -1759,7 +1759,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'CodeGraph',
       category: 'code-map',
       status: codegraphCommand === 'found' && codegraphDb === 'present' ? 'ready' : (codegraphCommand === 'found' || codegraphDb === 'present' ? 'partial' : 'missing'),
-      required: true,
+      required: false,
       summary: targetText(
         lang,
         '代码地图能力用于医生/研究者视角的实现追踪；缺失时可退回 manifest 和文件证据。',
@@ -1778,7 +1778,7 @@ function buildTargetSetupCapabilities(options: {
       title: 'Graphify',
       category: 'knowledge',
       status: graphifyCommand === 'found' && graphifyManifest === 'present' ? 'ready' : (graphifyCommand === 'found' || graphifyManifest === 'present' ? 'partial' : 'missing'),
-      required: true,
+      required: false,
       summary: targetText(
         lang,
         '知识图谱能力可增强医学证据、代码和交付物之间的关系追踪。',

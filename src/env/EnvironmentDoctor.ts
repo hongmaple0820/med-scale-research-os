@@ -231,7 +231,12 @@ export function inspectEnvironment(options: InspectEnvironmentOptions = {}): Env
     .map(entry => entry.trim())
     .filter(Boolean)
 
-  const checks = CHECK_DEFINITIONS.map(definition => inspectCommand(definition, resolver, runner, currentPlatform))
+  const checks = CHECK_DEFINITIONS.map(definition => inspectCommand(
+    definitionForPlatform(definition, currentPlatform),
+    resolver,
+    runner,
+    currentPlatform,
+  ))
   const nodeStatus = nodeVersionStatus(currentNodeVersion)
   const warnings = buildWarnings(checks, nodeStatus)
   const recommendations = buildRecommendations(checks, nodeStatus)
@@ -368,6 +373,21 @@ function inspectCommand(
     installHint: definition.installHint,
     requiredFor: definition.requiredFor,
   }
+}
+
+function definitionForPlatform(
+  definition: typeof CHECK_DEFINITIONS[number],
+  currentPlatform: NodeJS.Platform,
+): typeof CHECK_DEFINITIONS[number] {
+  return {
+    ...definition,
+    required: isRequiredForPlatform(definition, currentPlatform),
+  }
+}
+
+function isRequiredForPlatform(definition: typeof CHECK_DEFINITIONS[number], _currentPlatform: NodeJS.Platform): boolean {
+  if (definition.category !== 'core') return false
+  return definition.required
 }
 
 function runCommand(command: string, args: string[], resolvedPath?: string): CommandRunResult {
@@ -526,7 +546,7 @@ function interpretGbrainDoctorOutput(output: string): { status: EnvironmentCheck
     return {
       status: 'ok',
       reason: nonCoreWarnings.length > 0
-        ? `GBrain core recall is available; non-core doctor warnings: ${nonCoreWarnings.slice(0, 4).join(', ')}`
+        ? `GBrain core recall is available; optional doctor warnings: ${nonCoreWarnings.slice(0, 4).join(', ')}`
         : 'GBrain core recall is available.',
     }
   }

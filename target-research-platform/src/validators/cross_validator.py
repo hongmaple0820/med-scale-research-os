@@ -61,6 +61,10 @@ class CrossValidator:
         """
         sources = []
         discrepancies = []
+        if not (gtex_data or {}).get("tissues"):
+            gtex_data = None
+        if not self._extract_hpa_tissues(hpa_data or {}):
+            hpa_data = None
 
         # 收集数据源
         if gtex_data:
@@ -105,6 +109,9 @@ class CrossValidator:
             is_consistent = True  # 单源默认一致
         else:
             confidence = "none"
+            is_consistent = False
+
+        if len(sources) < 2:
             is_consistent = False
 
         result = ValidationResult(

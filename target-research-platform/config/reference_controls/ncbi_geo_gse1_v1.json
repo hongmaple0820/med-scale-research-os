@@ -1,0 +1,33 @@
+{
+  "schema": "medscale.reference_control.v1",
+  "control_id": "ncbi-geo-gse1-series-matrix-v1",
+  "source_id": "ncbi-geo",
+  "accession": "GSE1",
+  "filename": "GSE1_series_matrix.txt.gz",
+  "url": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSEnnn/GSE1/matrix/GSE1_series_matrix.txt.gz",
+  "expected_size_bytes": 920305,
+  "expected_sha256": "c648d83d234783f11b0bac9325727c3679914b87828f9274f0893d3829139f1f",
+  "expected_profile": {
+    "accession": "GSE1",
+    "series_types": [
+      "Expression profiling by array"
+    ],
+    "platform_ids": [
+      "GPL7"
+    ],
+    "sample_count": 38,
+    "data_row_count": 8192,
+    "markers": {
+      "table_begin": true,
+      "table_end": true,
+      "id_ref": true
+    }
+  },
+  "expected_schema_fingerprint": "7c5be69fd842f038d1e32e50a9bb549acfc5d3e9cf4aecd3d5538f6402776a8c",
+  "observed_at": "2026-06-19T00:00:00+08:00",
+  "observation_note": "Locally measured from the official NCBI HTTPS file; this is a MedSCALE fixed control, not an NCBI-published checksum.",
+  "official_documentation": [
+    "https://www.ncbi.nlm.nih.gov/geo/info/download.html",
+    "https://www.ncbi.nlm.nih.gov/geo/info/geo_paccess.html"
+  ]
+}

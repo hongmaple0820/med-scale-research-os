@@ -1,6 +1,6 @@
 {
   "name": "@hongmaple0820/med-scale-research-os",
-  "version": "0.44.0",
+  "version": "0.44.1",
   "description": "MedSCALE Research OS: evidence-driven medical research workflow with literature review, fact checks, package audit, memory review, and a researcher dashboard",
   "repository": {
     "type": "git",

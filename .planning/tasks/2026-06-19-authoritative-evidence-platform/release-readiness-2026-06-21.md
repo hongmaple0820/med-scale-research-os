@@ -2,7 +2,7 @@
 
 Date: 2026-06-21
 Level: CRITICAL
-Scope: MedSCALE Research OS 0.44.0 release readiness
+Scope: MedSCALE Research OS 0.44.1 release readiness
 
 ## Decision
 
@@ -12,6 +12,9 @@ The implementation and release gates are in a strong candidate state, but the wo
 contains a mixed set of tracked changes and untracked feature, evidence, architecture, and test
 files. Ship rules require staging reviewed files only, so publish/commit must wait until the
 release payload is selected and reviewed as a single candidate set.
+
+2026-06-21 update: the release candidate version was bumped from `0.44.0` to `0.44.1` because the
+remote Git tag `v0.44.0` already exists on a different commit while npm latest remains `0.43.3`.
 
 ## Verified Gates
 

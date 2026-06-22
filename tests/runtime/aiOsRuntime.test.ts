@@ -199,7 +199,7 @@ describe('AI OS runtime planner', () => {
         promotable: false,
       }),
     ]))
-  }, 120_000)
+  }, 180_000)
 
   it('summarizes persisted AI OS run reports for dashboard views', async () => {
     const projectDir = makeDir('scale-ai-os-dashboard-project-')

@@ -6,6 +6,8 @@ import { inspectEnvironment, type EnvironmentCommandCheck, type EnvironmentDocto
 import { inspectMemoryProviders, type MemoryProviderStatusReport } from '../memory/MemoryProviders.js'
 import { inspectToolCapabilities, type ToolCapabilityReport } from '../tools/ToolCapabilityRegistry.js'
 
+const OPTIONAL_ENHANCEMENT_DEPENDENCIES = new Set(['rtk', 'codegraph', 'graphify'])
+
 export interface SetupVerificationOptions {
   projectDir?: string
   scaleDir?: string
@@ -68,17 +70,28 @@ export async function verifySetup(options: SetupVerificationOptions = {}): Promi
   const warnings: string[] = []
   const nonBlockingDependencies = resolveNonBlockingDependencyIds(dependencyBootstrap, memoryProviders)
   const dependencyStatus = {
-    failed: dependencyBootstrap.items.filter(item => item.status === 'failed').map(item => item.id),
+    failed: dependencyBootstrap.items
+      .filter(item => item.status === 'failed' && !nonBlockingDependencies.has(item.id))
+      .map(item => item.id),
     manualReview: dependencyBootstrap.items
       .filter(item => item.status === 'manual-review' && !nonBlockingDependencies.has(item.id))
       .map(item => item.id),
     needsInit: dependencyBootstrap.items
       .filter(item => item.status === 'needs-init' && !nonBlockingDependencies.has(item.id))
       .map(item => item.id),
-    versionDrift: dependencyBootstrap.items.filter(item => item.status === 'version-drift').map(item => item.id),
+    versionDrift: dependencyBootstrap.items
+      .filter(item => item.status === 'version-drift' && !nonBlockingDependencies.has(item.id))
+      .map(item => item.id),
   }
   if (nonBlockingDependencies.has('gbrain')) {
     warnings.push('gbrain is unavailable in this runtime, but scale-local fallback remains available for governed memory recall.')
+  }
+  const optionalDependencyIssues = dependencyBootstrap.items
+    .filter(item => nonBlockingDependencies.has(item.id))
+    .filter(item => ['failed', 'manual-review', 'needs-init', 'version-drift'].includes(item.status))
+    .map(item => `${item.id}:${item.status}`)
+  if (optionalDependencyIssues.length > 0) {
+    warnings.push(`Optional enhancement capabilities are not production-ready: ${optionalDependencyIssues.join(', ')}`)
   }
 
   if (dependencyStatus.failed.length > 0) {
@@ -98,6 +111,7 @@ export async function verifySetup(options: SetupVerificationOptions = {}): Promi
   const missingRuntime = dependencyBootstrap.runtimeChecks.filter(check => check.status === 'missing')
   for (const check of missingRuntime) {
     const blocksVerification = check.requiredFor.some(id => {
+      if (nonBlockingDependencies.has(id)) return false
       const item = dependencyItemsById.get(id)
       return !item || (item.status !== 'installed' && item.status !== 'installed-now')
     })
@@ -227,7 +241,9 @@ function resolveNonBlockingDependencyIds(
   dependencyBootstrap: DependencyBootstrapReport,
   memoryProviders: MemoryProviderStatusReport,
 ): Set<string> {
-  const ids = new Set<string>()
+  const ids = new Set<string>(dependencyBootstrap.items
+    .map(item => item.id)
+    .filter(id => OPTIONAL_ENHANCEMENT_DEPENDENCIES.has(id)))
   const includesMemory = dependencyBootstrap.packIds.includes('full') || dependencyBootstrap.packIds.includes('memory')
   if (!includesMemory) return ids
 

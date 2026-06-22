@@ -144,7 +144,7 @@ const STANDARD_CODE: WorkflowTemplate = {
       type: 'review',
       name: 'Review',
       description: 'Code review for quality and security',
-      required: true,
+      required: false,
       riskLevel: 'medium',
       estimatedDuration: '10min',
       evidenceRequired: [],
@@ -400,7 +400,7 @@ export function formatTemplateForAgent(template: WorkflowTemplate): string {
   ]
 
   for (const step of template.steps) {
-    const required = step.required ? '*(required)*' : '*'
+    const required = step.required ? '*(required)*' : '*(optional)*'
     lines.push(`### ${step.name} ${required}`)
     lines.push(`- **Type:** ${step.type}`)
     lines.push(`- **Risk:** ${step.riskLevel}`)

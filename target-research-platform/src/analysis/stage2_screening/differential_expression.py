@@ -115,6 +115,18 @@ class DifferentialExpressionAnalyzer:
         else:
             return self._ttest_analysis(disease_expr, control_expr)
 
+    @staticmethod
+    def _compute_log2_effect(
+        mean_disease: float,
+        mean_control: float,
+        value_scale: str = "auto",
+    ) -> float:
+        if value_scale == "log":
+            return float(mean_disease - mean_control)
+        if mean_disease <= 0 or mean_control <= 0:
+            return float(mean_disease - mean_control)
+        return float(np.log2(mean_disease / mean_control))
+
     def _ttest_analysis(
         self,
         disease_expr: pd.Series,
@@ -135,10 +147,8 @@ class DifferentialExpressionAnalyzer:
         mean_disease = disease_expr.mean()
         mean_control = control_expr.mean()
 
-        if mean_control > 0:
-            log2fc = np.log2(mean_disease / mean_control)
-        else:
-            log2fc = float('inf') if mean_disease > 0 else 0
+        scale = "log" if float(pd.concat([disease_expr, control_expr]).min()) < 0 else "auto"
+        log2fc = self._compute_log2_effect(mean_disease, mean_control, scale)
 
         return {
             "method": "t-test",
@@ -165,10 +175,8 @@ class DifferentialExpressionAnalyzer:
         mean_disease = disease_expr.mean()
         mean_control = control_expr.mean()
 
-        if mean_control > 0:
-            log2fc = np.log2(mean_disease / mean_control)
-        else:
-            log2fc = float('inf') if mean_disease > 0 else 0
+        scale = "log" if float(pd.concat([disease_expr, control_expr]).min()) < 0 else "auto"
+        log2fc = self._compute_log2_effect(mean_disease, mean_control, scale)
 
         return {
             "method": "Mann-Whitney U",
@@ -267,7 +275,8 @@ class DifferentialExpressionAnalyzer:
         sample_groups: dict,
         known_targets: Optional[list[str]] = None,
         normal_tissue_expression: Optional[dict] = None,
-        top_n: int = 50
+        top_n: int = 50,
+        value_scale: str = "auto",
     ) -> dict:
         """
         筛选新靶点
@@ -320,10 +329,11 @@ class DifferentialExpressionAnalyzer:
                 mean_disease = disease_expr.mean()
                 mean_control = control_expr.mean()
 
-                if mean_control > 0:
-                    log2fc = np.log2(mean_disease / mean_control)
-                else:
-                    log2fc = float('inf') if mean_disease > 0 else 0
+                log2fc = self._compute_log2_effect(
+                    mean_disease,
+                    mean_control,
+                    value_scale=value_scale,
+                )
 
                 # 过滤正常组织高表达基因（阈值 50 TPM — 只过滤极高地表达基因）
                 if normal_tissue_expression and gene in normal_tissue_expression:

@@ -63,6 +63,56 @@ _PHASE_ZH: dict[str, str] = {
 }
 
 
+def assess_manuscript_readiness(
+    target: str,
+    disease: str,
+    stage1: dict,
+    stage2: dict,
+    stage3: dict,
+    stage4: dict,
+) -> dict[str, Any]:
+    """Require explicit upstream evidence approval before drafting claims."""
+    checks = {
+        "stage1_evidence": bool(
+            (stage1.get("summary") or {}).get("decision_eligible")
+            or (stage1.get("validation") or {})
+            .get("evidence_gate", {})
+            .get("decision_eligible")
+        ),
+        "stage2_evidence": bool(
+            (stage2.get("summary") or {}).get("decision_eligible")
+            or (stage2.get("stages") or {})
+            .get("source_validation", {})
+            .get("decision_eligible")
+        ),
+        "stage3_complete": bool(stage3.get("success")),
+        "stage4_complete": bool(stage4.get("success")),
+    }
+    issues = [
+        f"{name} did not pass"
+        for name, passed in checks.items()
+        if not passed
+    ]
+
+    stage1_target = str(stage1.get("gene") or "").strip().upper()
+    if stage1_target and stage1_target != target.strip().upper():
+        issues.append(
+            f"Stage 1 target {stage1_target} does not match requested target {target}."
+        )
+    stage2_disease = str(stage2.get("disease") or "").strip().lower()
+    if stage2_disease and stage2_disease != disease.strip().lower():
+        issues.append(
+            f"Stage 2 disease {stage2_disease} does not match requested disease {disease}."
+        )
+
+    return {
+        "status": "ready" if not issues else "blocked",
+        "decision_eligible": not issues,
+        "checks": checks,
+        "issues": issues,
+    }
+
+
 class ManuscriptGenerator:
     """从 pipeline 结果生成期刊论文 Markdown / DOCX 草稿（默认中文正文）。"""
 
@@ -83,8 +133,23 @@ class ManuscriptGenerator:
         s2 = stages.get("stage2", {}) or {}
         s3 = stages.get("stage3", {}) or {}
         s4 = stages.get("stage4", {}) or {}
+        readiness = assess_manuscript_readiness(
+            target, disease, s1, s2, s3, s4
+        )
+        if not readiness["decision_eligible"]:
+            return {
+                "success": False,
+                "status": "blocked",
+                "target": target,
+                "disease": disease,
+                "error": "Upstream evidence is not ready for manuscript generation.",
+                "readiness": readiness,
+                "paths": {},
+            }
 
         context = self._build_context(target, disease, s1, s2, s3, s4)
+        context["evidence_readiness"] = readiness
+        context["claim_ledger"] = self._build_claim_ledger(context)
         slug = f"{target}_{disease}".replace(" ", "_")
 
         enrich_result = enrich_papers_for_manuscript(
@@ -145,6 +210,7 @@ class ManuscriptGenerator:
         zhongliu_path = self.output_dir / f"{slug}_manuscript_zhongliu.md"
         json_path = self.output_dir / f"{slug}_manuscript_meta.json"
         fact_check_path = self.output_dir / f"{slug}_manuscript_fact_check.json"
+        claim_ledger_path = self.output_dir / f"{slug}_claim_ledger.json"
         quality_path = self.output_dir / f"{slug}_manuscript_quality.json"
         delivery_manifest_path = self.output_dir / f"{slug}_delivery_manifest.json"
         delivery_package_path = self.output_dir.parent / "deliveries" / f"{slug}_delivery.zip"
@@ -159,6 +225,15 @@ class ManuscriptGenerator:
         zhongliu_path.write_text(zhongliu_md, encoding="utf-8")
         json_path.write_text(
             json.dumps(context, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+        claim_ledger_path.write_text(
+            json.dumps(
+                context["claim_ledger"],
+                ensure_ascii=False,
+                indent=2,
+                default=str,
+            ),
             encoding="utf-8",
         )
 
@@ -184,6 +259,7 @@ class ManuscriptGenerator:
                 "zhongliu": str(zhongliu_path.resolve()),
                 "metadata": str(json_path.resolve()),
                 "fact_check": str(fact_check_path.resolve()),
+                "claim_ledger": str(claim_ledger_path.resolve()),
                 "docx": docx_path,
                 "figures_dir": str((self.output_dir / "figures").resolve()),
                 "literature_evidence_pack": str(evidence_pack_path.resolve()),
@@ -225,13 +301,76 @@ class ManuscriptGenerator:
         )
         result["paths"]["quality"] = str(quality_path.resolve())
         result["quality_gate"] = quality
-        write_delivery_manifest(result, delivery_manifest_path, base_dir=self.output_dir.parent)
-        result["delivery_package"] = create_delivery_package(
-            result,
-            delivery_package_path,
-            base_dir=self.output_dir.parent,
+        result["success"] = bool(
+            fact_check.get("passed") and quality.get("passed")
         )
+        if not result["success"]:
+            result["error"] = (
+                "Manuscript fact-check or quality gate did not pass."
+            )
+        write_delivery_manifest(result, delivery_manifest_path, base_dir=self.output_dir.parent)
+        if result["success"]:
+            result["delivery_package"] = create_delivery_package(
+                result,
+                delivery_package_path,
+                base_dir=self.output_dir.parent,
+            )
+        else:
+            result["delivery_package"] = None
         return result
+
+    @staticmethod
+    def _build_claim_ledger(context: dict[str, Any]) -> list[dict[str, Any]]:
+        clinical = context.get("clinical_summary") or {}
+        milestones = context.get("milestones") or {}
+        claims = [
+            (
+                "target_druggability",
+                context.get("target_druggability"),
+                "stage2.stages.primary_target_druggability.targets."
+                f"{context.get('target')}.composite_score",
+            ),
+            (
+                "pubmed_total",
+                context.get("pubmed_total"),
+                "stage3.stages.literature.data.search_results.total_count",
+            ),
+            (
+                "clinical_total_trials",
+                clinical.get("total_trials"),
+                "stage3.stages.clinical_pipeline.data.total_trials",
+            ),
+            (
+                "clinical_active_trials",
+                clinical.get("active_trials"),
+                "stage3.stages.clinical_pipeline.data.active_trials",
+            ),
+            (
+                "development_success_rate",
+                milestones.get("success_rate"),
+                "stage4.stages.milestones.data.overall_success_rate",
+            ),
+            (
+                "development_total_duration",
+                milestones.get("total_duration"),
+                "stage4.stages.milestones.data.total_duration_months",
+            ),
+            (
+                "development_total_cost",
+                milestones.get("total_cost"),
+                "stage4.stages.milestones.data.total_cost_estimate",
+            ),
+        ]
+        return [
+            {
+                "claim_id": claim_id,
+                "claim_type": "quantitative",
+                "value": value,
+                "source_locator": source_locator,
+            }
+            for claim_id, value, source_locator in claims
+            if value not in (None, "", [])
+        ]
 
     @staticmethod
     def _summarize_review_sources(reviews: list[dict]) -> dict[str, int]:
@@ -295,7 +434,11 @@ class ManuscriptGenerator:
 
         # --- Stage2: 筛选与成药性 ---
         de_stage = (s2.get("stages", {}) or {}).get("differential_expression", {}) or {}
-        de_source = de_stage.get("fallback_source") or de_stage.get("accession") or "TCGA/GEO"
+        source_validation = (
+            (s2.get("stages", {}) or {}).get("source_validation", {}) or {}
+        )
+        independent_sources = source_validation.get("independent_sources") or []
+        de_source = " + ".join(independent_sources) or de_stage.get("accession") or "GEO + TCGA"
         de_method = de_stage.get("method", "标准差异表达分析")
 
         top_targets = (
@@ -309,8 +452,20 @@ class ManuscriptGenerator:
         )
 
         drug_stage = (s2.get("stages", {}) or {}).get("druggability", {}) or {}
+        primary_drug_stage = (
+            (s2.get("stages", {}) or {}).get("primary_target_druggability", {})
+            or {}
+        )
         drug_targets = drug_stage.get("targets", {}) if isinstance(drug_stage.get("targets"), dict) else {}
-        target_drug = drug_targets.get(target, {}) if isinstance(drug_targets, dict) else {}
+        primary_targets = (
+            primary_drug_stage.get("targets", {})
+            if isinstance(primary_drug_stage.get("targets"), dict)
+            else {}
+        )
+        target_drug = (
+            primary_targets.get(target)
+            or (drug_targets.get(target, {}) if isinstance(drug_targets, dict) else {})
+        )
         target_druggability = (
             target_drug.get("composite_score")
             or next((t.get("druggability_score") or t.get("score") for t in top_targets if t.get("gene") == target), None)
@@ -771,9 +926,9 @@ ClinicalTrials.gov 检索到 {clin.get('total_trials', '—')} 项相关试验�
 
         return f"""# {ctx['title_zh']}
 
-> **稿件类型：** 基于公共数据的计算药理学研究论文（中文草稿）  
-> **生成时间：** {ctx['generated_at']}  
-> **数据置信度：** {ctx.get('confidence', 'medium')}  
+> **稿件类型：** 基于公共数据的计算药理学研究论文（中文草稿）
+> **生成时间：** {ctx['generated_at']}
+> **数据置信度：** {ctx.get('confidence', 'medium')}
 > **说明：** 本文由靶点研究平台自动合成，正文为中文。投稿前须补充作者信息、伦理声明、原创实验与期刊格式。
 
 ---

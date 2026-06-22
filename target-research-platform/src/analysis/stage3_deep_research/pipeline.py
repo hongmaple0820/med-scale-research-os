@@ -117,6 +117,9 @@ class Stage3Pipeline:
 
         # 生成摘要
         results["summary"] = self._generate_summary(results)
+        results["success"] = all(
+            validation_result.get("data_completeness", {}).values()
+        )
 
         # 保存结果
         self._save_results(target_name, disease, results)

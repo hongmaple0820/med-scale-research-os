@@ -16,6 +16,7 @@ from ...api_clients.opentargets_client import OpenTargetsClient
 from ...api_clients.tcga_client import TCGAClient
 from ...validators.data_provenance import ProvenanceTracker
 from ...validators.cross_validator import CrossValidator
+from ...validators.evidence_gate import compare_de_sources
 from .differential_expression import DifferentialExpressionAnalyzer
 from .druggability_score import DruggabilityScorer
 
@@ -86,31 +87,43 @@ class Stage2Pipeline:
         geo_result = self._search_geo_datasets(disease)
         results["stages"]["geo_search"] = geo_result
 
-        # 2. 差异表达分析（GEO → TCGA 回退）
+        # 2. 独立执行 GEO 与 TCGA 差异表达分析
         self.logger.info("[2/4] 差异表达分析...")
-        de_result = self._run_differential_expression(disease, geo_result, known_targets, normal_tissue_expression)
-        results["stages"]["differential_expression"] = de_result
-
-        # 如果 GEO DE 失败或结果不可靠，尝试 TCGA/FireBrowse DE
-        if not de_result.get("success") or de_result.get("method") == "positional":
-            self.logger.info("  - GEO DE 不可靠，尝试 TCGA/FireBrowse DE...")
-            tcga_de = self._run_tcga_differential_expression(disease, cancer_code)
-            if tcga_de.get("success"):
-                # TCGA 结果替换 GEO 结果
-                self.logger.info(f"  - TCGA DE 成功: {tcga_de.get('gene_count', 0)} 基因, "
-                                f"{len(tcga_de.get('significant_genes', []))} 显著")
-                de_result = tcga_de
-                results["stages"]["differential_expression"] = de_result
-                results["stages"]["differential_expression"]["fallback_source"] = "TCGA/FireBrowse"
-            else:
-                self.logger.warning(f"  - TCGA DE 也失败: {tcga_de.get('error', 'unknown')}")
+        geo_de_result = self._run_differential_expression(
+            disease,
+            geo_result,
+            known_targets,
+            normal_tissue_expression,
+        )
+        tcga_de = self._run_tcga_differential_expression(disease, cancer_code)
+        geo_de_result["source"] = "GEO"
+        tcga_de["source"] = "TCGA/FireBrowse"
+        results["stages"]["differential_expression"] = geo_de_result
+        results["stages"]["tcga_replication"] = tcga_de
 
         # 3. 成药性评估
         self.logger.info("[3/4] 成药性评估...")
-        # 从 DE 结果获取候选靶点，传给成药性评估
-        de_candidates = []
-        if de_result.get("success"):
-            de_candidates = de_result.get("significant_genes", [])
+        source_validation = compare_de_sources(geo_de_result, tcga_de)
+        results["stages"]["source_validation"] = source_validation
+
+        if not source_validation.get("decision_eligible"):
+            results["stages"]["druggability"] = {
+                "success": False,
+                "status": "skipped",
+                "reason": "Independent GEO/TCGA differential-expression validation did not pass.",
+            }
+            results["stages"]["ranking"] = {
+                "success": False,
+                "status": "skipped",
+                "reason": "Ranking is forbidden until multi-source expression validation passes.",
+            }
+            results["validation"] = self._validate_results(results)
+            results["summary"] = self._generate_summary(results)
+            results["success"] = False
+            self._save_results(disease, results)
+            return results
+
+        de_candidates = source_validation.get("validated_genes", [])
         druggability_result = self._evaluate_druggability(disease, de_candidates, known_targets)
         results["stages"]["druggability"] = druggability_result
 
@@ -129,9 +142,21 @@ class Stage2Pipeline:
 
         # 4. 综合排序
         self.logger.info("[4/4] 综合排序...")
+        if known_targets:
+            results["stages"]["primary_target_druggability"] = {
+                "success": True,
+                "targets": {
+                    gene: druggability_result.get("targets", {}).get(gene)
+                    for gene in known_targets
+                    if druggability_result.get("targets", {}).get(gene)
+                },
+            }
+            for gene in known_targets:
+                druggability_result.get("targets", {}).pop(gene, None)
+
         ranking_result = self._rank_targets(
             disease,
-            de_result,
+            {"success": True, "significant_genes": de_candidates},
             druggability_result,
             top_n
         )
@@ -140,6 +165,10 @@ class Stage2Pipeline:
         # 验证
         validation_result = self._validate_results(results)
         results["validation"] = validation_result
+        results["success"] = bool(
+            validation_result.get("evidence_status") == "verified"
+            and ranking_result.get("success")
+        )
 
         # 生成摘要
         results["summary"] = self._generate_summary(results)
@@ -175,8 +204,8 @@ class Stage2Pipeline:
         if not datasets:
             return {"success": False, "error": "无可用 GEO 表达数据集（已过滤 SuperSeries）"}
 
-        # 尝试下载并解析前 5 个数据集
-        for dataset in datasets[:5]:
+        # 尝试下载并解析前 10 个数据集
+        for dataset in datasets[:10]:
             accession = dataset.get("accession", "")
             if not accession:
                 continue
@@ -197,7 +226,8 @@ class Stage2Pipeline:
             self.logger.info(f"  - 解析表达矩阵（自动探针ID映射）...")
             parse_result = self.geo_client.parse_series_matrix(
                 dl_result.data["file_path"],
-                cache_dir=self.cache_dir
+                cache_dir=self.cache_dir,
+                metadata_file=dl_result.data.get("metadata_file"),
             )
             if not parse_result.success:
                 self.logger.warning(f"解析失败: {parse_result.error}")
@@ -221,7 +251,8 @@ class Stage2Pipeline:
             # 验证分组方法：positional 分组结果不可靠，标记为降级
             group_method = groups.get("method", "unknown")
             if group_method == "positional":
-                self.logger.warning(f"样本分组使用位置推断法（结果可能不准确）")
+                self.logger.warning("样本分组使用位置推断法，拒绝用于证据门禁")
+                continue
 
             self.logger.info(f"  - 执行差异表达分析 (disease={len(groups['disease'])}, control={len(groups['control'])}, method={group_method})...")
 
@@ -259,10 +290,13 @@ class Stage2Pipeline:
                     sample_groups=groups,
                     known_targets=known_targets,
                     normal_tissue_expression=normal_tissue_expression,
-                    top_n=50
+                    top_n=1000,
+                    value_scale=parse_result.data.get("value_scale", "auto"),
                 )
 
                 if screen_result.get("success"):
+                    if screen_result.get("filter_level") != "strict":
+                        continue
                     result = {
                         "success": True,
                         "accession": accession,
@@ -272,6 +306,7 @@ class Stage2Pipeline:
                         "control_samples": len(groups["control"]),
                         "significant_genes": screen_result.get("top_targets", []),
                         "method": groups.get("method", "unknown"),
+                        "filter_level": screen_result.get("filter_level"),
                         "probe_mapping_stats": probe_stats,
                         "provenance": self.provenance_tracker.get_summary()
                     }
@@ -373,7 +408,7 @@ class Stage2Pipeline:
         """搜索GEO数据集"""
         self.logger.info(f"  - 搜索RNA-seq数据集...")
         rnaseq_response = self.geo_client.find_differential_expression_datasets(
-            disease, max_results=10
+            disease, max_results=50
         )
 
         if rnaseq_response.success:
@@ -403,7 +438,7 @@ class Stage2Pipeline:
         microarray_response = self.geo_client.search_datasets(
             disease,
             dataset_type="Expression profiling by array",
-            max_results=10
+            max_results=20
         )
 
         if microarray_response.success:
@@ -453,16 +488,12 @@ class Stage2Pipeline:
             "targets": {}
         }
 
-        # 收集候选靶点集合：DE 筛选的 + 固定热门靶点
+        # 只收集独立 DE 验证支持的候选靶点。
         candidate_genes = set()
         for cand in de_candidates:
             gene = cand.get("gene_symbol") or cand.get("gene", "")
             if gene:
                 candidate_genes.add(gene)
-
-        # 如果 DE 没有结果，使用一组常见药物靶点作为后备
-        if not candidate_genes:
-            candidate_genes = {"CDK4", "CDK6", "EGFR", "BRAF", "KRAS"}
 
         # 合并额外靶点（不被排除）
         if extra_genes:
@@ -471,6 +502,13 @@ class Stage2Pipeline:
         # 过滤已知靶点（exclude_targets 优先）
         targets_to_exclude = set(exclude_targets or known_targets or [])
         candidate_genes -= targets_to_exclude
+
+        if not candidate_genes:
+            return {
+                "success": False,
+                "targets": {},
+                "error": "No evidence-backed candidate genes are available.",
+            }
 
         self.logger.info(f"  - 查询 OpenTargets 评估 {len(candidate_genes)} 个靶点...")
 
@@ -499,27 +537,33 @@ class Stage2Pipeline:
                 total_drug_candidates = druggability.get("total_drug_candidates", 0)
                 drugs = druggability.get("drugs", [])
                 # 直接从每条 drug 记录中取数字化的 max_phase_num
-                max_phase = max(
-                    (d.get("max_phase_num", 0) for d in drugs),
-                    default=0
-                )
-
-                # 计算成药性评分（基于真实数据）
                 score_result = self.druggability_scorer.score_target(
                     gene_symbol=gene,
                     opentargets_data={
                         "association_score": min(total_drug_candidates / 100.0, 1.0),
                         "datatype_scores": {
-                            "known_drug": min(total_drug_candidates / 50.0, 1.0) if total_drug_candidates else 0,
-                            "literature": 0.5
+                            "known_drug": min(total_drug_candidates / 50.0, 1.0)
+                            if total_drug_candidates else 0
                         }
-                    },
-                    pharos_class="Tchem" if total_drug_candidates > 0 else "Tbio",
-                    chembl_data={
-                        "active_compounds": total_drug_candidates,
-                        "max_phase": max_phase
                     }
                 )
+                score_result["evidence_sources"] = ["OpenTargets"]
+                score_result["source_scope"] = "single_source"
+                score_result["source_record"] = {
+                    "source": "OpenTargets",
+                    "endpoint": ot_response.endpoint,
+                    "params": ot_response.params,
+                    "timestamp": ot_response.timestamp,
+                    "drug_candidates": total_drug_candidates,
+                    "max_phase": max(
+                        (d.get("max_phase_num", 0) for d in drugs),
+                        default=0,
+                    ),
+                }
+                score_result["limitations"] = [
+                    "Pharos and ChEMBL were not queried independently.",
+                    "This is descriptive OpenTargets evidence, not multi-source druggability validation.",
+                ]
 
                 result["targets"][gene] = score_result
 
@@ -557,23 +601,6 @@ class Stage2Pipeline:
                     # 用 |log2FC| 归一化为 0-1 分数
                     log2fc = abs(cand.get("log2_fold_change", cand.get("log2fc", 0)))
                     de_scores[gene] = min(log2fc / 5.0, 1.0)
-
-        # DE 回退：无显著基因时，从全量分析结果中取 top 基因
-        # 这确保即使宽松过滤也无法找到显著基因时，仍有 DE 信息可用
-        if not de_scores and de_result.get("success"):
-            all_targets = de_result.get("significant_genes", [])
-            if not all_targets:
-                # 从 top_targets 取（screen_new_targets 的输出）
-                all_targets = de_result.get("top_targets", [])
-            for cand in all_targets[:20]:
-                gene = cand.get("gene_symbol") or cand.get("gene", "")
-                if gene:
-                    log2fc = abs(cand.get("log2_fold_change", cand.get("log2fc", 0)))
-                    p_value = cand.get("p_value", 1.0)
-                    # 用 log2FC 和 p_value 联合打分
-                    if log2fc > 0 and p_value < 0.1:
-                        score = min(log2fc / 5.0, 1.0) * (1 - p_value)
-                        de_scores[gene] = round(score, 4)
 
         # 计算 DE 信号强度分布（用于自适应权重）
         de_values = list(de_scores.values())
@@ -678,6 +705,10 @@ class Stage2Pipeline:
 
         # 检查数据完整性
         stages = results.get("stages", {})
+        source_validation = stages.get("source_validation", {}) or {}
+        validation["evidence_status"] = source_validation.get("status", "blocked")
+        validation["source_validation"] = source_validation
+        validation["issues"].extend(source_validation.get("issues", []))
 
         if not stages.get("geo_search", {}).get("success"):
             validation["issues"].append("GEO数据集搜索失败")
@@ -690,6 +721,9 @@ class Stage2Pipeline:
 
         validation["data_completeness"] = {
             "geo_search": stages.get("geo_search", {}).get("success", False),
+            "geo_de": stages.get("differential_expression", {}).get("success", False),
+            "tcga_replication": stages.get("tcga_replication", {}).get("success", False),
+            "source_validation": source_validation.get("decision_eligible", False),
             "druggability": stages.get("druggability", {}).get("success", False),
             "ranking": stages.get("ranking", {}).get("success", False)
         }
@@ -703,17 +737,28 @@ class Stage2Pipeline:
 
         summary = {
             "disease": disease,
-            "analysis_status": "completed",
+            "analysis_status": (
+                stages.get("source_validation", {}).get("status", "blocked")
+            ),
             "key_findings": [],
             "data_sources": [],
-            "top_candidates": []
+            "top_candidates": [],
+            "decision_eligible": (
+                stages.get("source_validation", {}).get("decision_eligible", False)
+            ),
+            "evidence_issues": (
+                stages.get("source_validation", {}).get("issues", [])
+            )
         }
 
         # GEO数据集
         geo_search = stages.get("geo_search", {})
-        if geo_search.get("success"):
+        source_validation = stages.get("source_validation", {}) or {}
+        if source_validation.get("decision_eligible"):
             total_count = geo_search.get("total_count", 0)
-            summary["data_sources"].append("GEO")
+            summary["data_sources"].extend(
+                source_validation.get("independent_sources", [])
+            )
             summary["key_findings"].append(
                 f"找到{total_count}个相关GEO数据集"
             )

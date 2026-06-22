@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -234,6 +235,807 @@ class DashboardState:
             return payload if isinstance(payload, dict) else {}
         except Exception:
             return {}
+
+    def _read_artifact_payload(self, manifest: dict, manifest_path: Path) -> dict:
+        artifact_path = self._artifact_payload_path(manifest, manifest_path)
+        return self._read_json(artifact_path)
+
+    @staticmethod
+    def _artifact_payload_path(manifest: dict, manifest_path: Path) -> Path | None:
+        absolute_path = manifest.get("absolute_path")
+        if absolute_path:
+            path = Path(str(absolute_path))
+            if path.exists():
+                return path
+        relative_path = manifest.get("relative_path")
+        if not relative_path:
+            return None
+        project_root = manifest_path.parent.parent
+        candidate = project_root / str(relative_path)
+        return candidate if candidate.exists() else None
+
+    @staticmethod
+    def _short_artifact_id(value: object) -> str:
+        text = str(value or "")
+        return text if len(text) <= 14 else f"{text[:8]}...{text[-4:]}"
+
+    @staticmethod
+    def _schema_title(schema: str) -> str:
+        return {
+            "medscale.terminology_mapping_request.v1": "Terminology mapping request",
+            "medscale.terminology_mapping_decision.v1": "Terminology mapping decision",
+            "medscale.pubmed_evidence_worksheet.v1": "PubMed evidence worksheet",
+            "medscale.claim_record.v1": "Claim record",
+            "medscale.genui_review_action_draft.v1": "GenUI action draft",
+            "medscale.genui_review_action_confirmation.v1": "GenUI draft confirmation",
+        }.get(schema, schema or "Review artifact")
+
+    @staticmethod
+    def _genui_card_state(schema: str, review_status: str, payload: dict) -> str:
+        if review_status == "approved":
+            return "pass"
+        if review_status in {"rejected", "invalidated"}:
+            return "fail"
+        if schema == "medscale.terminology_mapping_decision.v1":
+            decision_status = ((payload.get("decision") or {}).get("status") or "")
+            return "warning" if decision_status else "pending"
+        if schema == "medscale.claim_record.v1":
+            return "warning"
+        if schema == "medscale.genui_review_action_draft.v1":
+            return "pending" if payload.get("ok") else "fail"
+        if schema == "medscale.genui_review_action_confirmation.v1":
+            return "pending" if payload.get("ok") else "fail"
+        return "pending"
+
+    @staticmethod
+    def _genui_controls_for_artifact(schema: str, review_status: str, payload: dict) -> list[dict]:
+        controls: list[dict] = []
+        if schema == "medscale.terminology_mapping_request.v1":
+            candidates = payload.get("candidates") if isinstance(payload.get("candidates"), list) else []
+            controls.extend([
+                {
+                    "type": "select",
+                    "id": "selected_id",
+                    "label": "Canonical ID",
+                    "options": [
+                        {
+                            "value": item.get("descriptor_ui"),
+                            "label": f"{item.get('descriptor_ui')} / {item.get('preferred_name')}",
+                        }
+                        for item in candidates
+                        if isinstance(item, dict) and item.get("descriptor_ui")
+                    ],
+                    "enabled": review_status == "approved",
+                },
+                {
+                    "type": "textarea",
+                    "id": "reviewer_rationale",
+                    "label": "Reviewer rationale",
+                    "required": True,
+                    "enabled": review_status == "approved",
+                },
+                {
+                    "type": "button_group",
+                    "id": "mapping_decision",
+                    "actions": ["select", "reject_all"],
+                    "enabled": review_status == "approved",
+                },
+            ])
+        elif schema == "medscale.pubmed_evidence_worksheet.v1":
+            locators = DashboardState._worksheet_review_locators(payload)
+            controls.extend([
+                {
+                    "type": "select",
+                    "id": "locator",
+                    "label": "Evidence locator",
+                    "options": [
+                        {"value": locator, "label": locator}
+                        for locator in locators
+                    ],
+                    "enabled": review_status == "approved",
+                },
+                {
+                    "type": "textarea",
+                    "id": "claim_text",
+                    "label": "Human-authored claim",
+                    "required": True,
+                    "enabled": review_status == "approved",
+                },
+                {
+                    "type": "select",
+                    "id": "stance",
+                    "label": "Stance",
+                    "options": [
+                        {"value": "support", "label": "support"},
+                        {"value": "oppose", "label": "oppose"},
+                        {"value": "uncertain", "label": "uncertain"},
+                    ],
+                    "enabled": review_status == "approved",
+                },
+                {
+                    "type": "textarea",
+                    "id": "evidence_assessment.study_design",
+                    "label": "Study design assessment",
+                    "required": True,
+                    "enabled": review_status == "approved",
+                },
+                {
+                    "type": "textarea",
+                    "id": "evidence_assessment.risk_of_bias",
+                    "label": "Risk of bias assessment",
+                    "required": True,
+                    "enabled": review_status == "approved",
+                },
+                {
+                    "type": "textarea",
+                    "id": "evidence_assessment.certainty",
+                    "label": "Certainty assessment",
+                    "required": True,
+                    "enabled": review_status == "approved",
+                },
+                {
+                    "type": "textarea",
+                    "id": "evidence_assessment.applicability",
+                    "label": "Applicability assessment",
+                    "required": True,
+                    "enabled": review_status == "approved",
+                },
+                {
+                    "type": "button",
+                    "id": "submit_claim",
+                    "label": "Submit claim to ledger",
+                    "enabled": review_status == "approved",
+                },
+            ])
+        elif schema == "medscale.genui_review_action_draft.v1":
+            controls.extend([
+                {
+                    "type": "textarea",
+                    "id": "reviewer_id",
+                    "label": "Reviewer ID",
+                    "required": True,
+                    "enabled": payload.get("ok") is True and payload.get("write_enabled") is False,
+                },
+                {
+                    "type": "select",
+                    "id": "reviewer_role",
+                    "label": "Reviewer role",
+                    "options": [
+                        {"value": "principal_investigator", "label": "principal_investigator"},
+                        {"value": "literature_reviewer", "label": "literature_reviewer"},
+                        {"value": "medical_fact_checker", "label": "medical_fact_checker"},
+                        {"value": "memory_curator", "label": "memory_curator"},
+                    ],
+                    "enabled": payload.get("ok") is True and payload.get("write_enabled") is False,
+                },
+                {
+                    "type": "textarea",
+                    "id": "confirmation_rationale",
+                    "label": "Confirmation rationale",
+                    "required": True,
+                    "enabled": payload.get("ok") is True and payload.get("write_enabled") is False,
+                },
+                {
+                    "type": "checkbox",
+                    "id": "acknowledge_no_execution",
+                    "label": "I understand this confirmation does not execute the operation.",
+                    "required": True,
+                    "enabled": payload.get("ok") is True and payload.get("write_enabled") is False,
+                },
+                {
+                    "type": "button",
+                    "id": "confirm_draft",
+                    "label": "Confirm draft for execution review",
+                    "enabled": payload.get("ok") is True and payload.get("write_enabled") is False,
+                },
+            ])
+        return controls
+
+    @staticmethod
+    def _worksheet_review_locators(payload: dict) -> list[str]:
+        records = payload.get("records") if isinstance(payload.get("records"), list) else []
+        locators: list[str] = []
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            review_items = record.get("review_items") if isinstance(record.get("review_items"), list) else []
+            for item in review_items:
+                if isinstance(item, dict) and item.get("locator"):
+                    locators.append(str(item["locator"]))
+        return locators
+
+    def _genui_review_card(self, manifest: dict, payload: dict, manifest_path: Path) -> dict:
+        schema = str(payload.get("schema") or "")
+        review_status = str(manifest.get("review_status") or "unknown")
+        state = self._genui_card_state(schema, review_status, payload)
+        details: list[str] = [
+            f"artifact={self._short_artifact_id(manifest.get('artifact_id'))}",
+            f"review={review_status}",
+            f"stage={manifest.get('layer') or '-'}",
+        ]
+        if schema == "medscale.terminology_mapping_request.v1":
+            candidates = payload.get("candidates") if isinstance(payload.get("candidates"), list) else []
+            details.extend([
+                f"query={payload.get('query') or '-'}",
+                f"domain={payload.get('requested_entity_domain') or '-'}",
+                f"candidates={len(candidates)}",
+                f"selected_id={payload.get('selected_id') or 'none'}",
+            ])
+        elif schema == "medscale.terminology_mapping_decision.v1":
+            decision = payload.get("decision") if isinstance(payload.get("decision"), dict) else {}
+            details.extend([
+                f"query={payload.get('query') or '-'}",
+                f"decision={decision.get('status') or '-'}",
+                f"selected_id={decision.get('selected_id') or 'none'}",
+                f"reject_all={decision.get('reject_all')}",
+            ])
+        elif schema == "medscale.pubmed_evidence_worksheet.v1":
+            records = payload.get("records") if isinstance(payload.get("records"), list) else []
+            locator_count = sum(
+                len(record.get("review_items") or [])
+                for record in records
+                if isinstance(record, dict)
+            )
+            details.extend([
+                f"records={len(records)}",
+                f"locators={locator_count}",
+                f"claim_count={payload.get('claim_count', 0)}",
+                f"source_text_copied={payload.get('source_text_copied_into_worksheet')}",
+            ])
+        elif schema == "medscale.claim_record.v1":
+            details.extend([
+                f"claim={self._short_artifact_id(payload.get('claim_id'))}",
+                f"stance={payload.get('stance') or '-'}",
+                f"locator={payload.get('locator') or '-'}",
+                f"source={payload.get('source_record_id') or '-'}",
+            ])
+        elif schema == "medscale.genui_review_action_draft.v1":
+            operation = payload.get("proposed_operation") if isinstance(payload.get("proposed_operation"), dict) else {}
+            details.extend([
+                f"source_artifact={self._short_artifact_id(payload.get('source_artifact_id') or payload.get('artifact_id'))}",
+                f"action={payload.get('action') or '-'}",
+                f"entrypoint={operation.get('entrypoint') or '-'}",
+                f"dry_run={payload.get('dry_run')}",
+                f"write_enabled={payload.get('write_enabled')}",
+            ])
+        elif schema == "medscale.genui_review_action_confirmation.v1":
+            reviewer = payload.get("reviewer") if isinstance(payload.get("reviewer"), dict) else {}
+            operation = payload.get("proposed_operation") if isinstance(payload.get("proposed_operation"), dict) else {}
+            details.extend([
+                f"draft={self._short_artifact_id(payload.get('draft_artifact_id'))}",
+                f"source_artifact={self._short_artifact_id(payload.get('source_artifact_id'))}",
+                f"reviewer={reviewer.get('id') or '-'}",
+                f"role={reviewer.get('role') or '-'}",
+                f"entrypoint={operation.get('entrypoint') or '-'}",
+                f"write_enabled={payload.get('write_enabled')}",
+            ])
+        return {
+            "id": str(manifest.get("artifact_id") or manifest_path.stem),
+            "schema": schema,
+            "title": self._schema_title(schema),
+            "state": state,
+            "status_label": review_status,
+            "manifest_path": str(manifest_path.resolve()),
+            "artifact_path": str(self._artifact_payload_path(manifest, manifest_path) or ""),
+            "details": details,
+            "controls": self._genui_controls_for_artifact(schema, review_status, payload),
+        }
+
+    def _genui_review_workbench(self) -> dict:
+        schemas = {
+            "medscale.terminology_mapping_request.v1",
+            "medscale.terminology_mapping_decision.v1",
+            "medscale.pubmed_evidence_worksheet.v1",
+            "medscale.claim_record.v1",
+            "medscale.genui_review_action_draft.v1",
+            "medscale.genui_review_action_confirmation.v1",
+        }
+        cards: list[dict] = []
+        for manifest_path in self.output_dir.rglob("manifests/*.json"):
+            manifest = self._read_json(manifest_path)
+            if manifest.get("schema") != "medscale.artifact_manifest.v1":
+                continue
+            payload = self._read_artifact_payload(manifest, manifest_path)
+            if payload.get("schema") not in schemas:
+                continue
+            cards.append(self._genui_review_card(manifest, payload, manifest_path))
+        cards.sort(key=lambda item: (item.get("schema") or "", item.get("id") or ""))
+        actionable = sum(1 for card in cards if card.get("controls"))
+        return {
+            "schema": "medscale.genui_review_workbench.v1",
+            "generated_at": datetime.now().isoformat(),
+            "mode": "deterministic-local-renderer",
+            "sdk_reference": {
+                "article": "OpenTiny GenUI SDK",
+                "server_package": "@opentiny/genui-sdk-server",
+                "vue_package": "@opentiny/genui-sdk-vue",
+                "adoption": "local schema renderer before LLM-generated UI",
+            },
+            "card_count": len(cards),
+            "actionable_count": actionable,
+            "cards": cards,
+        }
+
+    def _find_genui_review_artifact(self, artifact_id: str) -> tuple[dict, dict, Path] | None:
+        artifact_id = str(artifact_id or "").strip()
+        if not artifact_id:
+            return None
+        for manifest_path in self.output_dir.rglob("manifests/*.json"):
+            manifest = self._read_json(manifest_path)
+            if manifest.get("schema") != "medscale.artifact_manifest.v1":
+                continue
+            if str(manifest.get("artifact_id") or "") != artifact_id:
+                continue
+            payload = self._read_artifact_payload(manifest, manifest_path)
+            return manifest, payload, manifest_path
+        return None
+
+    @staticmethod
+    def _genui_draft_error(
+        message: str,
+        *,
+        artifact_id: str = "",
+        action: str = "",
+        status: HTTPStatus = HTTPStatus.BAD_REQUEST,
+        details: list[str] | None = None,
+    ) -> tuple[bool, dict, HTTPStatus]:
+        return False, {
+            "schema": "medscale.genui_review_action_draft.v1",
+            "ok": False,
+            "dry_run": True,
+            "write_enabled": False,
+            "persisted": False,
+            "artifact_id": artifact_id,
+            "action": action,
+            "error": message,
+            "details": details or [],
+        }, status
+
+    def build_genui_review_action_draft(self, request: dict) -> tuple[bool, dict, HTTPStatus]:
+        """Validate a GenUI review intent without writing approval or medical artifacts."""
+        artifact_id = str(request.get("artifact_id") or "").strip()
+        action = str(request.get("action") or "").strip()
+        fields = request.get("fields") if isinstance(request.get("fields"), dict) else {}
+        persist = request.get("persist") is True
+        if not artifact_id:
+            return self._genui_draft_error("Missing artifact_id.", action=action)
+        if not action:
+            return self._genui_draft_error("Missing action.", artifact_id=artifact_id)
+
+        found = self._find_genui_review_artifact(artifact_id)
+        if not found:
+            return self._genui_draft_error(
+                "Review artifact was not found in the local artifact store.",
+                artifact_id=artifact_id,
+                action=action,
+                status=HTTPStatus.NOT_FOUND,
+            )
+        manifest, payload, manifest_path = found
+        schema = str(payload.get("schema") or "")
+        review_status = str(manifest.get("review_status") or "unknown")
+        allowed_actions = {
+            "medscale.terminology_mapping_request.v1": {"select", "reject_all"},
+            "medscale.pubmed_evidence_worksheet.v1": {"submit_claim"},
+        }
+        if action not in allowed_actions.get(schema, set()):
+            return self._genui_draft_error(
+                f"Action {action!r} is not supported for {schema or 'unknown artifact schema'}.",
+                artifact_id=artifact_id,
+                action=action,
+            )
+        if review_status != "approved":
+            return self._genui_draft_error(
+                "Review artifact must be approved before this action draft can be executable.",
+                artifact_id=artifact_id,
+                action=action,
+                status=HTTPStatus.CONFLICT,
+                details=[f"review_status={review_status}"],
+            )
+
+        if schema == "medscale.terminology_mapping_request.v1":
+            ok, operation_or_error, status = self._mapping_action_operation(payload, fields, action, artifact_id)
+        elif schema == "medscale.pubmed_evidence_worksheet.v1":
+            ok, operation_or_error, status = self._worksheet_claim_operation(payload, fields, artifact_id)
+        else:
+            return self._genui_draft_error(
+                f"Unsupported review schema: {schema}",
+                artifact_id=artifact_id,
+                action=action,
+            )
+        if not ok:
+            return self._genui_draft_error(
+                str(operation_or_error),
+                artifact_id=artifact_id,
+                action=action,
+                status=status,
+            )
+
+        response = {
+            "schema": "medscale.genui_review_action_draft.v1",
+            "ok": True,
+            "dry_run": True,
+            "write_enabled": False,
+            "persisted": False,
+            "generated_at": datetime.now().isoformat(),
+            "artifact_id": artifact_id,
+            "source_artifact_id": artifact_id,
+            "artifact_schema": schema,
+            "review_status": review_status,
+            "action": action,
+            "manifest_path": str(manifest_path.resolve()),
+            "artifact_path": str(self._artifact_payload_path(manifest, manifest_path) or ""),
+            "proposed_operation": operation_or_error,
+            "warnings": [
+                "Draft only: no approval, mapping decision, or claim artifact was written.",
+                "Enable authenticated reviewer write paths before executing this operation.",
+            ],
+            "next_steps": [
+                "Have the responsible reviewer confirm the fields.",
+                "Route the confirmed draft through the Research OS decision entrypoint.",
+                "Require a separate review event for any newly created artifact.",
+            ],
+        }
+        if persist:
+            self._persist_genui_action_draft(response, source_manifest=manifest)
+        return True, response, HTTPStatus.OK
+
+    def _persist_genui_action_draft(self, draft: dict, *, source_manifest: dict) -> None:
+        """Persist a validated draft as an audit artifact without executing the operation."""
+        draft_payload = {
+            **draft,
+            "persisted": True,
+            "persisted_at": datetime.now().isoformat(),
+        }
+        draft_seed = json.dumps(
+            draft_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        draft_artifact_id = f"msa-genui-draft-{hashlib.sha256(draft_seed).hexdigest()[:16]}"
+        draft_payload["draft_artifact_id"] = draft_artifact_id
+        content = (
+            json.dumps(draft_payload, ensure_ascii=False, sort_keys=True, indent=2)
+            + "\n"
+        ).encode("utf-8")
+        content_hash = hashlib.sha256(content).hexdigest()
+
+        project_root = self.runtime_dir / "genui-action-drafts"
+        analysis_dir = project_root / "analysis"
+        manifest_dir = project_root / "manifests"
+        analysis_dir.mkdir(parents=True, exist_ok=True)
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        artifact_path = analysis_dir / f"{draft_artifact_id}.json"
+        manifest_path = manifest_dir / f"{draft_artifact_id}.json"
+        artifact_path.write_bytes(content)
+
+        manifest = {
+            "schema": "medscale.artifact_manifest.v1",
+            "artifact_id": draft_artifact_id,
+            "project_id": "dashboard-genui-action-drafts",
+            "layer": "analysis",
+            "source_id": "dashboard-genui-review-workbench",
+            "source_ids": [
+                item for item in {
+                    "dashboard-genui-review-workbench",
+                    str(source_manifest.get("source_id") or ""),
+                } if item
+            ],
+            "stable_record_ids": source_manifest.get("stable_record_ids") or [],
+            "retrieval": {
+                "source_artifact_id": draft.get("source_artifact_id") or draft.get("artifact_id"),
+                "source_manifest_path": draft.get("manifest_path"),
+                "action": draft.get("action"),
+                "dry_run": True,
+            },
+            "license": {
+                "scope": "internal-review",
+                "public_export_allowed": False,
+            },
+            "sha256": content_hash,
+            "size_bytes": len(content),
+            "media_type": "application/json",
+            "producer": {
+                "name": "dashboard-genui-review-workbench",
+                "version": "1",
+            },
+            "parent_artifact_ids": [draft.get("source_artifact_id") or draft.get("artifact_id")],
+            "method_card_id": "genui-action-draft-v1",
+            "relative_path": f"analysis/{artifact_path.name}",
+            "absolute_path": str(artifact_path.resolve()),
+            "manifest_path": str(manifest_path.resolve()),
+            "created_at": datetime.now().isoformat(),
+            "review_status": "review_required",
+        }
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        draft.update({
+            "persisted": True,
+            "persisted_at": draft_payload["persisted_at"],
+            "draft_artifact_id": draft_artifact_id,
+            "draft_artifact_path": str(artifact_path.resolve()),
+            "draft_manifest_path": str(manifest_path.resolve()),
+            "draft_sha256": content_hash,
+        })
+        draft["warnings"] = [
+            "Draft artifact persisted for audit; no approval, mapping decision, or claim artifact was written.",
+            "Enable authenticated reviewer write paths before executing this operation.",
+        ]
+
+    @staticmethod
+    def _genui_confirmation_error(
+        message: str,
+        *,
+        draft_artifact_id: str = "",
+        status: HTTPStatus = HTTPStatus.BAD_REQUEST,
+        details: list[str] | None = None,
+    ) -> tuple[bool, dict, HTTPStatus]:
+        return False, {
+            "schema": "medscale.genui_review_action_confirmation.v1",
+            "ok": False,
+            "dry_run": True,
+            "write_enabled": False,
+            "persisted": False,
+            "draft_artifact_id": draft_artifact_id,
+            "error": message,
+            "details": details or [],
+        }, status
+
+    def build_genui_review_action_confirmation(self, request: dict) -> tuple[bool, dict, HTTPStatus]:
+        """Persist a reviewer confirmation envelope for a dry-run draft without executing it."""
+        draft_artifact_id = str(request.get("draft_artifact_id") or "").strip()
+        fields = request.get("fields") if isinstance(request.get("fields"), dict) else {}
+        if not draft_artifact_id:
+            return self._genui_confirmation_error("Missing draft_artifact_id.")
+
+        found = self._find_genui_review_artifact(draft_artifact_id)
+        if not found:
+            return self._genui_confirmation_error(
+                "Draft artifact was not found in the local artifact store.",
+                draft_artifact_id=draft_artifact_id,
+                status=HTTPStatus.NOT_FOUND,
+            )
+        manifest, draft, manifest_path = found
+        if draft.get("schema") != "medscale.genui_review_action_draft.v1":
+            return self._genui_confirmation_error(
+                "Only GenUI action draft artifacts can be confirmed.",
+                draft_artifact_id=draft_artifact_id,
+                status=HTTPStatus.CONFLICT,
+            )
+        if draft.get("ok") is not True or draft.get("dry_run") is not True or draft.get("write_enabled") is not False:
+            return self._genui_confirmation_error(
+                "Only successful dry-run drafts with write_enabled=false can be confirmed.",
+                draft_artifact_id=draft_artifact_id,
+                status=HTTPStatus.CONFLICT,
+            )
+
+        reviewer_id = str(fields.get("reviewer_id") or "").strip()
+        reviewer_role = str(fields.get("reviewer_role") or "").strip()
+        rationale = str(fields.get("confirmation_rationale") or "").strip()
+        acknowledge_no_execution = fields.get("acknowledge_no_execution") is True
+        missing = []
+        if not reviewer_id:
+            missing.append("reviewer_id")
+        if not reviewer_role:
+            missing.append("reviewer_role")
+        if not rationale:
+            missing.append("confirmation_rationale")
+        if not acknowledge_no_execution:
+            missing.append("acknowledge_no_execution")
+        if missing:
+            return self._genui_confirmation_error(
+                f"Missing confirmation fields: {', '.join(missing)}.",
+                draft_artifact_id=draft_artifact_id,
+            )
+
+        confirmation = {
+            "schema": "medscale.genui_review_action_confirmation.v1",
+            "ok": True,
+            "dry_run": True,
+            "write_enabled": False,
+            "persisted": False,
+            "generated_at": datetime.now().isoformat(),
+            "draft_artifact_id": draft_artifact_id,
+            "source_artifact_id": draft.get("source_artifact_id") or draft.get("artifact_id"),
+            "action": draft.get("action"),
+            "artifact_schema": draft.get("artifact_schema"),
+            "review_status": str(manifest.get("review_status") or "unknown"),
+            "draft_manifest_path": str(manifest_path.resolve()),
+            "draft_artifact_path": str(self._artifact_payload_path(manifest, manifest_path) or ""),
+            "reviewer": {
+                "id": reviewer_id,
+                "role": reviewer_role,
+            },
+            "confirmation_rationale": rationale,
+            "acknowledgements": {
+                "no_execution_performed": True,
+                "requires_separate_execution_review": True,
+                "requires_new_artifact_review": True,
+            },
+            "proposed_operation": draft.get("proposed_operation") or {},
+            "warnings": [
+                "Confirmation persisted for audit; no approval, mapping decision, or claim artifact was written.",
+                "A separate authenticated execution path is required before this operation can run.",
+            ],
+            "next_steps": [
+                "Review the confirmation artifact.",
+                "Verify reviewer identity and authorization.",
+                "Only then route to a separate execution endpoint.",
+            ],
+        }
+        self._persist_genui_action_confirmation(confirmation, draft_manifest=manifest)
+        return True, confirmation, HTTPStatus.OK
+
+    def _persist_genui_action_confirmation(self, confirmation: dict, *, draft_manifest: dict) -> None:
+        confirmation_payload = {
+            **confirmation,
+            "persisted": True,
+            "persisted_at": datetime.now().isoformat(),
+        }
+        seed = json.dumps(
+            confirmation_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        confirmation_artifact_id = f"msa-genui-confirm-{hashlib.sha256(seed).hexdigest()[:16]}"
+        confirmation_payload["confirmation_artifact_id"] = confirmation_artifact_id
+        content = (
+            json.dumps(confirmation_payload, ensure_ascii=False, sort_keys=True, indent=2)
+            + "\n"
+        ).encode("utf-8")
+        content_hash = hashlib.sha256(content).hexdigest()
+
+        project_root = self.runtime_dir / "genui-action-confirmations"
+        analysis_dir = project_root / "analysis"
+        manifest_dir = project_root / "manifests"
+        analysis_dir.mkdir(parents=True, exist_ok=True)
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        artifact_path = analysis_dir / f"{confirmation_artifact_id}.json"
+        manifest_path = manifest_dir / f"{confirmation_artifact_id}.json"
+        artifact_path.write_bytes(content)
+
+        parent_ids = [
+            item for item in (
+                confirmation.get("draft_artifact_id"),
+                confirmation.get("source_artifact_id"),
+            ) if item
+        ]
+        manifest = {
+            "schema": "medscale.artifact_manifest.v1",
+            "artifact_id": confirmation_artifact_id,
+            "project_id": "dashboard-genui-action-confirmations",
+            "layer": "analysis",
+            "source_id": "dashboard-genui-review-workbench",
+            "source_ids": [
+                item for item in {
+                    "dashboard-genui-review-workbench",
+                    str(draft_manifest.get("source_id") or ""),
+                } if item
+            ],
+            "stable_record_ids": draft_manifest.get("stable_record_ids") or [],
+            "retrieval": {
+                "draft_artifact_id": confirmation.get("draft_artifact_id"),
+                "source_artifact_id": confirmation.get("source_artifact_id"),
+                "draft_manifest_path": confirmation.get("draft_manifest_path"),
+                "action": confirmation.get("action"),
+                "dry_run": True,
+            },
+            "license": {
+                "scope": "internal-review",
+                "public_export_allowed": False,
+            },
+            "sha256": content_hash,
+            "size_bytes": len(content),
+            "media_type": "application/json",
+            "producer": {
+                "name": "dashboard-genui-review-workbench",
+                "version": "1",
+            },
+            "parent_artifact_ids": parent_ids,
+            "method_card_id": "genui-action-confirmation-v1",
+            "relative_path": f"analysis/{artifact_path.name}",
+            "absolute_path": str(artifact_path.resolve()),
+            "manifest_path": str(manifest_path.resolve()),
+            "created_at": datetime.now().isoformat(),
+            "review_status": "review_required",
+        }
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        confirmation.update({
+            "persisted": True,
+            "persisted_at": confirmation_payload["persisted_at"],
+            "confirmation_artifact_id": confirmation_artifact_id,
+            "confirmation_artifact_path": str(artifact_path.resolve()),
+            "confirmation_manifest_path": str(manifest_path.resolve()),
+            "confirmation_sha256": content_hash,
+        })
+
+    @staticmethod
+    def _mapping_action_operation(
+        payload: dict,
+        fields: dict,
+        action: str,
+        artifact_id: str,
+    ) -> tuple[bool, dict | str, HTTPStatus]:
+        reviewer_rationale = str(fields.get("reviewer_rationale") or "").strip()
+        if not reviewer_rationale:
+            return False, "reviewer_rationale is required.", HTTPStatus.BAD_REQUEST
+        candidates = payload.get("candidates") if isinstance(payload.get("candidates"), list) else []
+        candidate_ids = {
+            str(item.get("descriptor_ui"))
+            for item in candidates
+            if isinstance(item, dict) and item.get("descriptor_ui")
+        }
+        base_payload = {
+            "mapping_request_artifact_id": artifact_id,
+            "query": payload.get("query"),
+            "reviewer_rationale": reviewer_rationale,
+        }
+        if action == "reject_all":
+            return True, {
+                "entrypoint": "TerminologyMappingDecisionRecorder.reject_all",
+                "payload": {
+                    **base_payload,
+                    "reject_all": True,
+                },
+            }, HTTPStatus.OK
+        selected_id = str(fields.get("selected_id") or "").strip()
+        if not selected_id:
+            return False, "selected_id is required.", HTTPStatus.BAD_REQUEST
+        if selected_id not in candidate_ids:
+            return False, "selected_id must come from the reviewed candidate snapshot.", HTTPStatus.CONFLICT
+        return True, {
+            "entrypoint": "TerminologyMappingDecisionRecorder.select",
+            "payload": {
+                **base_payload,
+                "selected_id": selected_id,
+                "candidate_count": len(candidate_ids),
+            },
+        }, HTTPStatus.OK
+
+    @staticmethod
+    def _worksheet_claim_operation(
+        payload: dict,
+        fields: dict,
+        artifact_id: str,
+    ) -> tuple[bool, dict | str, HTTPStatus]:
+        locator = str(fields.get("locator") or "").strip()
+        claim_text = str(fields.get("claim_text") or "").strip()
+        stance = str(fields.get("stance") or "").strip()
+        assessment = fields.get("evidence_assessment") if isinstance(fields.get("evidence_assessment"), dict) else {}
+        if not locator:
+            return False, "locator is required.", HTTPStatus.BAD_REQUEST
+        valid_locators = set(DashboardState._worksheet_review_locators(payload))
+        if locator not in valid_locators:
+            return False, "locator must come from the reviewed worksheet locator snapshot.", HTTPStatus.CONFLICT
+        if not claim_text:
+            return False, "claim_text is required.", HTTPStatus.BAD_REQUEST
+        if stance not in {"support", "oppose", "uncertain"}:
+            return False, "stance must be support, oppose, or uncertain.", HTTPStatus.BAD_REQUEST
+        required_fields = ["study_design", "risk_of_bias", "certainty", "applicability"]
+        missing = [name for name in required_fields if not str(assessment.get(name) or "").strip()]
+        if missing:
+            return False, f"evidence_assessment is missing: {', '.join(missing)}.", HTTPStatus.BAD_REQUEST
+        return True, {
+            "entrypoint": "PubMedWorksheetClaimSubmitter.submit_claim",
+            "payload": {
+                "worksheet_artifact_id": artifact_id,
+                "locator": locator,
+                "claim_text": claim_text,
+                "stance": stance,
+                "evidence_assessment": {
+                    name: str(assessment.get(name) or "").strip()
+                    for name in required_fields
+                },
+            },
+        }, HTTPStatus.OK
 
     @staticmethod
     def _dict_value(value: object) -> dict:
@@ -598,6 +1400,8 @@ class DashboardState:
         runtime_readiness = self._medical_runtime_readiness()
         summary["medical_runtime_readiness"] = runtime_readiness
         token_cost = self._token_cost_report()
+        genui_review_workbench = self._genui_review_workbench()
+        summary["genui_review_workbench"] = genui_review_workbench
 
         signals = self._medical_os_signals(readiness, researcher_cards)
         score = self._medical_os_score(signals)
@@ -647,6 +1451,7 @@ class DashboardState:
                 "safe_preview": True,
             },
             "memory_strategy": self._medical_os_memory_strategy(readiness),
+            "genui_review_workbench": genui_review_workbench,
             "token_cost": token_cost,
             "runtime_readiness": runtime_readiness,
             "next_migrations": [
@@ -2137,6 +2942,12 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/memory-review":
             self._handle_memory_review_request()
             return
+        if parsed.path == "/api/genui-review-action-draft":
+            self._handle_genui_review_action_draft_request()
+            return
+        if parsed.path == "/api/genui-review-action-confirmation":
+            self._handle_genui_review_action_confirmation_request()
+            return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def _read_json_body(self) -> dict:
@@ -2158,6 +2969,14 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def _handle_memory_review_request(self) -> None:
         ok, payload, status = self.dashboard_state.review_memory_candidate(self._read_json_body())
+        self._send_json(payload, status=status)
+
+    def _handle_genui_review_action_draft_request(self) -> None:
+        _ok, payload, status = self.dashboard_state.build_genui_review_action_draft(self._read_json_body())
+        self._send_json(payload, status=status)
+
+    def _handle_genui_review_action_confirmation_request(self) -> None:
+        _ok, payload, status = self.dashboard_state.build_genui_review_action_confirmation(self._read_json_body())
         self._send_json(payload, status=status)
 
     def _send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:

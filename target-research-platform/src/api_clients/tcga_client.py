@@ -4,6 +4,7 @@ TCGA/GDC API客户端
 表达数据：FireBrowse API (http://firebrowse.org)
 临床数据：GDC API (https://api.gdc.cancer.gov)
 """
+import json
 import math
 from typing import Optional
 from .base_client import BaseAPIClient, APIResponse
@@ -249,17 +250,28 @@ class TCGAClient(BaseAPIClient):
         ]
 
         response = self._make_request(
-            "POST",
+            "GET",
             "/cases",
-            json_data={
-                "filters": filters,
+            params={
+                "filters": json.dumps(filters, separators=(",", ":")),
                 "fields": ",".join(fields),
-                "size": 10000
+                "size": 10000,
             }
         )
 
         if not response.success:
-            return response
+            response = self._make_request(
+                "POST",
+                "/cases",
+                json_data={
+                    "filters": filters,
+                    "fields": ",".join(fields),
+                    "size": 10000
+                },
+                use_cache=False
+            )
+            if not response.success:
+                return response
 
         return self._parse_clinical_response(response, project_id)
 

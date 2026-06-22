@@ -12,6 +12,16 @@
         "med-scale-research-os"
       ]
     },
+    "ci": {
+      "commands": {
+        "build": "npm run build:ci",
+        "lint": "npm run lint:ci",
+        "test": "npm run test:ci"
+      },
+      "services": [
+        "med-scale-research-os"
+      ]
+    },
     "productSmoke": {
       "commands": {
         "smoke": "powershell -ExecutionPolicy Bypass -File scripts/qa/product-smoke.ps1"

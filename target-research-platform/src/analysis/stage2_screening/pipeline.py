@@ -204,8 +204,8 @@ class Stage2Pipeline:
         if not datasets:
             return {"success": False, "error": "无可用 GEO 表达数据集（已过滤 SuperSeries）"}
 
-        # 尝试下载并解析前 5 个数据集
-        for dataset in datasets[:5]:
+        # 尝试下载并解析前 10 个数据集
+        for dataset in datasets[:10]:
             accession = dataset.get("accession", "")
             if not accession:
                 continue
@@ -226,7 +226,8 @@ class Stage2Pipeline:
             self.logger.info(f"  - 解析表达矩阵（自动探针ID映射）...")
             parse_result = self.geo_client.parse_series_matrix(
                 dl_result.data["file_path"],
-                cache_dir=self.cache_dir
+                cache_dir=self.cache_dir,
+                metadata_file=dl_result.data.get("metadata_file"),
             )
             if not parse_result.success:
                 self.logger.warning(f"解析失败: {parse_result.error}")
@@ -289,7 +290,8 @@ class Stage2Pipeline:
                     sample_groups=groups,
                     known_targets=known_targets,
                     normal_tissue_expression=normal_tissue_expression,
-                    top_n=50
+                    top_n=1000,
+                    value_scale=parse_result.data.get("value_scale", "auto"),
                 )
 
                 if screen_result.get("success"):
@@ -406,7 +408,7 @@ class Stage2Pipeline:
         """搜索GEO数据集"""
         self.logger.info(f"  - 搜索RNA-seq数据集...")
         rnaseq_response = self.geo_client.find_differential_expression_datasets(
-            disease, max_results=10
+            disease, max_results=50
         )
 
         if rnaseq_response.success:
@@ -436,7 +438,7 @@ class Stage2Pipeline:
         microarray_response = self.geo_client.search_datasets(
             disease,
             dataset_type="Expression profiling by array",
-            max_results=10
+            max_results=20
         )
 
         if microarray_response.success:

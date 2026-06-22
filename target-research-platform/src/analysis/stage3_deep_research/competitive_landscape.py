@@ -110,20 +110,21 @@ class CompetitiveAnalyzer:
             if status in active_statuses:
                 active_trials += 1
 
-        # 如果没有活跃试验从 status_dist 算出的结果，使用顶层的 active_trials
-        if active_trials == 0:
-            active_trials = clinical_data.get("active_trials", 0)
+        authoritative_active_trials = clinical_data.get("active_trials", 0)
+        if authoritative_active_trials > 0:
+            active_trials = authoritative_active_trials
 
         # top_sponsors — 优先从 studies 计算，或使用顶层的 top_players
         top_sponsors = {}
-        for s in studies:
-            sponsor = s.get("sponsor", "")
+        for p in clinical_data.get("top_players", []):
+            sponsor = p.get("sponsor", "")
             if sponsor:
-                top_sponsors[sponsor] = top_sponsors.get(sponsor, 0) + 1
+                top_sponsors[sponsor] = p.get("trial_count", 1)
         if not top_sponsors:
-            # 使用 get_competitive_landscape 的 top_players 格式
-            for p in clinical_data.get("top_players", []):
-                top_sponsors[p.get("sponsor", "")] = p.get("trial_count", 1)
+            for s in studies:
+                sponsor = s.get("sponsor", "")
+                if sponsor:
+                    top_sponsors[sponsor] = top_sponsors.get(sponsor, 0) + 1
 
         return {
             "total_trials": clinical_data.get("total_trials", len(studies)),
@@ -195,13 +196,15 @@ class CompetitiveAnalyzer:
 
         # 主要玩家 — 从 studies 构建，或使用顶层 top_players
         sponsor_counts = {}
-        for s in studies:
-            sponsor = s.get("sponsor", "")
+        for p in clinical_data.get("top_players", []):
+            sponsor = p.get("sponsor", "")
             if sponsor:
-                sponsor_counts[sponsor] = sponsor_counts.get(sponsor, 0) + 1
+                sponsor_counts[sponsor] = p.get("trial_count", 1)
         if not sponsor_counts:
-            for p in clinical_data.get("top_players", []):
-                sponsor_counts[p.get("sponsor", "")] = p.get("trial_count", 1)
+            for s in studies:
+                sponsor = s.get("sponsor", "")
+                if sponsor:
+                    sponsor_counts[sponsor] = sponsor_counts.get(sponsor, 0) + 1
 
         players = []
         for sponsor, count in sponsor_counts.items():
@@ -221,7 +224,7 @@ class CompetitiveAnalyzer:
             })
 
         # 按管线强度排序
-        players.sort(key=lambda x: x["phase_score"], reverse=True)
+        players.sort(key=lambda x: (x["trial_count"], x["phase_score"]), reverse=True)
 
         # 竞争集中度
         total_trials = clinical_data.get("total_trials", len(studies))

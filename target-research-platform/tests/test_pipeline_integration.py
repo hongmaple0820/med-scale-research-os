@@ -277,4 +277,74 @@ class TestStageIntegration:
             assert bp["data"]["success"] is True
 
 
+class TestReleaseRegressionCoverage:
+    def test_log_scaled_effects_remain_finite(self):
+        from src.analysis.stage2_screening.differential_expression import DifferentialExpressionAnalyzer
+
+        analyzer = DifferentialExpressionAnalyzer()
+        expression_matrix = pd.DataFrame(
+            {
+                "tumor_1": [9.0, 8.0, 7.5, 1.0],
+                "tumor_2": [9.2, 8.1, 7.3, 1.1],
+                "tumor_3": [8.8, 7.9, 7.4, 1.2],
+                "control_1": [6.0, 9.5, 6.5, -0.5],
+                "control_2": [6.1, 9.3, 6.4, -0.4],
+                "control_3": [5.9, 9.4, 6.6, -0.6],
+            },
+            index=["CDK1", "FGFR1", "PARP1", "NOISE"],
+        )
+
+        result = analyzer.screen_new_targets(
+            disease="breast cancer",
+            expression_matrix=expression_matrix,
+            sample_groups={
+                "disease": ["tumor_1", "tumor_2", "tumor_3"],
+                "control": ["control_1", "control_2", "control_3"],
+            },
+            known_targets=["CDK4"],
+            top_n=10,
+            value_scale="log",
+        )
+
+        assert result["success"] is True
+        returned = {item["gene_symbol"]: item for item in result["top_targets"]}
+        assert {"CDK1", "FGFR1"} <= set(returned)
+        assert all(returned[gene]["log2fc"] != float("inf") for gene in ("CDK1", "FGFR1"))
+
+    def test_competitive_summary_prefers_authoritative_rollups(self):
+        from src.analysis.stage3_deep_research.competitive_landscape import CompetitiveAnalyzer
+
+        analyzer = CompetitiveAnalyzer()
+        clinical_data = {
+            "total_trials": 100,
+            "active_trials": 58,
+            "phase_distribution": {"Phase 2": 31, "Phase 3": 20},
+            "top_players": [
+                {"sponsor": "Fudan University", "trial_count": 10},
+                {"sponsor": "Pfizer", "trial_count": 8},
+            ],
+            "studies": [
+                {"sponsor": "Local Hospital", "phase": "Phase 2", "status_chinese": "招募中"}
+                for _ in range(13)
+            ]
+            + [
+                {"sponsor": "Local Hospital", "phase": "Phase 1", "status_chinese": "已完成"}
+                for _ in range(7)
+            ],
+        }
+
+        result = analyzer.analyze(
+            target_name="CDK4",
+            disease="breast cancer",
+            clinical_data=clinical_data,
+            drug_data={},
+            patent_data={},
+        )
+
+        assert result["sections"]["clinical_pipeline"]["active_trials"] == 58
+        findings = result["executive_summary"]["key_findings"]
+        assert any("58" in item for item in findings)
+        assert any("Fudan University" in item for item in findings)
+
+
 import tempfile

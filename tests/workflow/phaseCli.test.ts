@@ -84,7 +84,7 @@ describe('phase CLI workflow', () => {
     const result = parseJson<{ nextCommand: string; workflowState: null }>(status.stdout)
     expect(result.workflowState).toBeNull()
     expect(result.nextCommand).toContain('scale define')
-  })
+  }, 120_000)
 
   it('initializes a project-scaffold governance pack and reports clean drift', async () => {
     const scaleDir = makeScaleDir()

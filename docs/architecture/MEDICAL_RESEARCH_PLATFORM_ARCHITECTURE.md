@@ -1,9 +1,5 @@
 # 医学研究工作流平台 — 可扩展系统架构设计
 
-> **Superseded notice（2026-06-19）**：本草案包含真实 LLM 推理、自动综合评分和 AI
-> 假设生成等历史方向，已不再作为 MedSCALE Research OS 的目标架构。当前有效设计见
-> [MedSCALE 权威证据研究执行平台 V2](MEDSCALE_AUTHORITATIVE_EVIDENCE_PLATFORM_V2.md)。
-
 > **版本**: 1.0.0-draft
 > **日期**: 2026-06-08
 > **状态**: Proposed

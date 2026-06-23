@@ -29,7 +29,8 @@ class CompetitiveAnalyzer:
         disease: Optional[str] = None,
         clinical_data: Optional[dict] = None,
         drug_data: Optional[dict] = None,
-        patent_data: Optional[dict] = None
+        patent_data: Optional[dict] = None,
+        market_data: Optional[dict] = None
     ) -> dict:
         """
         执行竞争格局分析
@@ -78,7 +79,8 @@ class CompetitiveAnalyzer:
 
         # 5. 市场分析
         result["sections"]["market_analysis"] = self._analyze_market(
-            result["sections"]
+            result["sections"],
+            market_data
         )
 
         # 6. 生成摘要
@@ -110,21 +112,21 @@ class CompetitiveAnalyzer:
             if status in active_statuses:
                 active_trials += 1
 
-        authoritative_active_trials = clinical_data.get("active_trials", 0)
-        if authoritative_active_trials > 0:
-            active_trials = authoritative_active_trials
+        # 如果没有活跃试验从 status_dist 算出的结果，使用顶层的 active_trials
+        if "active_trials" in clinical_data:
+            active_trials = clinical_data.get("active_trials", 0)
 
         # top_sponsors — 优先从 studies 计算，或使用顶层的 top_players
         top_sponsors = {}
-        for p in clinical_data.get("top_players", []):
-            sponsor = p.get("sponsor", "")
+        for s in studies:
+            sponsor = s.get("sponsor", "")
             if sponsor:
-                top_sponsors[sponsor] = p.get("trial_count", 1)
-        if not top_sponsors:
-            for s in studies:
-                sponsor = s.get("sponsor", "")
-                if sponsor:
-                    top_sponsors[sponsor] = top_sponsors.get(sponsor, 0) + 1
+                top_sponsors[sponsor] = top_sponsors.get(sponsor, 0) + 1
+        if clinical_data.get("top_players"):
+            top_sponsors = {}
+            # 使用 get_competitive_landscape 的 top_players 格式
+            for p in clinical_data.get("top_players", []):
+                top_sponsors[p.get("sponsor", "")] = p.get("trial_count", 1)
 
         return {
             "total_trials": clinical_data.get("total_trials", len(studies)),
@@ -196,15 +198,14 @@ class CompetitiveAnalyzer:
 
         # 主要玩家 — 从 studies 构建，或使用顶层 top_players
         sponsor_counts = {}
-        for p in clinical_data.get("top_players", []):
-            sponsor = p.get("sponsor", "")
+        for s in studies:
+            sponsor = s.get("sponsor", "")
             if sponsor:
-                sponsor_counts[sponsor] = p.get("trial_count", 1)
-        if not sponsor_counts:
-            for s in studies:
-                sponsor = s.get("sponsor", "")
-                if sponsor:
-                    sponsor_counts[sponsor] = sponsor_counts.get(sponsor, 0) + 1
+                sponsor_counts[sponsor] = sponsor_counts.get(sponsor, 0) + 1
+        if clinical_data.get("top_players"):
+            sponsor_counts = {}
+            for p in clinical_data.get("top_players", []):
+                sponsor_counts[p.get("sponsor", "")] = p.get("trial_count", 1)
 
         players = []
         for sponsor, count in sponsor_counts.items():
@@ -224,7 +225,7 @@ class CompetitiveAnalyzer:
             })
 
         # 按管线强度排序
-        players.sort(key=lambda x: (x["trial_count"], x["phase_score"]), reverse=True)
+        players.sort(key=lambda x: x["phase_score"], reverse=True)
 
         # 竞争集中度
         total_trials = clinical_data.get("total_trials", len(studies))
@@ -313,6 +314,8 @@ class CompetitiveAnalyzer:
 
         return {
             "total_patents": len(patents),
+            "data_sources": patent_data.get("data_sources", []),
+            "source_url": patent_data.get("source_url", ""),
             "year_trend": year_counts,
             "top_applicants": dict(top_applicants),
             "recent_patents": [
@@ -326,7 +329,7 @@ class CompetitiveAnalyzer:
             ]
         }
 
-    def _analyze_market(self, sections: dict) -> dict:
+    def _analyze_market(self, sections: dict, market_data: Optional[dict] = None) -> dict:
         """分析市场情况"""
         clinical = sections.get("clinical_pipeline", {})
         approved = sections.get("approved_drugs", {})
@@ -336,6 +339,9 @@ class CompetitiveAnalyzer:
         total_trials = clinical.get("total_trials", 0)
         active_trials = clinical.get("active_trials", 0)
         approved_drugs = approved.get("total_drugs", 0)
+        regulatory_records = (market_data or {}).get("records", [])
+        if regulatory_records:
+            approved_drugs = max(approved_drugs, len(regulatory_records))
 
         # 市场成熟度评估
         if approved_drugs >= 5:
@@ -359,10 +365,17 @@ class CompetitiveAnalyzer:
         return {
             "maturity": maturity,
             "opportunity": opportunity,
+            "data_sources": (market_data or {}).get("data_sources", []),
+            "source_urls": (market_data or {}).get("source_urls", []),
+            "evidence_records": regulatory_records,
+            "total_records": (market_data or {}).get("total_records", len(regulatory_records)),
+            "returned_records": (market_data or {}).get("returned_records", len(regulatory_records)),
+            "limitations": (market_data or {}).get("limitations", []),
             "indicators": {
                 "total_trials": total_trials,
                 "active_trials": active_trials,
                 "approved_drugs": approved_drugs,
+                "regulatory_label_records": len(regulatory_records),
                 "competition_intensity": competition_intensity
             }
         }

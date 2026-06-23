@@ -106,6 +106,29 @@ export interface TargetRuntimeReadiness {
   recommendations: string[]
 }
 
+export interface TargetReleaseReadinessCheck {
+  id: string
+  title: string
+  state: 'pass' | 'warning' | 'fail'
+  statusLabel: string
+  summary: string
+  details: string[]
+  nextAction: string
+}
+
+export interface TargetReleaseReadiness {
+  schema: 'medscale.release_readiness.v1'
+  ok: boolean
+  status: 'ready' | 'blocked'
+  generatedAt: string
+  workspaceRoot: string
+  runtimeReadiness: TargetRuntimeReadiness
+  checks: TargetReleaseReadinessCheck[]
+  blockers: string[]
+  warnings: string[]
+  recommendations: string[]
+}
+
 export interface TargetTokenCostLane {
   key: string
   label: string
@@ -121,6 +144,7 @@ export interface TargetTokenCostReport {
   generatedAt: string
   workspaceRoot: string
   usagePath: string
+  noModelUsageAttestation?: TargetNoModelUsageAttestation
   window: {
     day?: string
     since?: string
@@ -135,6 +159,17 @@ export interface TargetTokenCostReport {
   byMedicalLane: TargetTokenCostLane[]
   records: ModelUsageReport['records']
   recommendations: string[]
+}
+
+export interface TargetNoModelUsageAttestation {
+  schema: 'medscale.no_model_usage_attestation.v1'
+  status: 'attested'
+  generatedAt: string
+  workspaceRoot: string
+  releaseScope: string
+  reason: string
+  assertedBy: string
+  evidence: string[]
 }
 
 export interface TargetTokenUsageIngestSource {
@@ -292,6 +327,10 @@ function targetUsagePath(root: string): string {
   return join(targetScaleDir(root), 'model-usage', 'usage.jsonl')
 }
 
+function targetNoModelUsageAttestationPath(root: string): string {
+  return join(targetScaleDir(root), 'model-usage', 'no-model-usage-attestation.json')
+}
+
 function normalizeSinceDaysValue(value: unknown, fallback = 30): number | undefined {
   if (value === undefined || value === null || value === '') return fallback
   const raw = String(value).trim().toLowerCase()
@@ -333,6 +372,72 @@ function medicalLaneLabel(lane: string): string {
     workflow: 'Workflow',
   }
   return labels[lane] ?? lane
+}
+
+function parseStringList(raw: unknown): string[] {
+  if (raw === undefined || raw === null || raw === '') return []
+  return String(raw)
+    .split(/[;,]/g)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function parseNoModelUsageAttestation(value: unknown): TargetNoModelUsageAttestation | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  if (record.schema !== 'medscale.no_model_usage_attestation.v1') return null
+  if (record.status !== 'attested') return null
+  const reason = typeof record.reason === 'string' ? record.reason.trim() : ''
+  const generatedAt = typeof record.generatedAt === 'string' ? record.generatedAt.trim() : ''
+  const workspaceRoot = typeof record.workspaceRoot === 'string' ? record.workspaceRoot.trim() : ''
+  const releaseScope = typeof record.releaseScope === 'string' ? record.releaseScope.trim() : ''
+  const assertedBy = typeof record.assertedBy === 'string' ? record.assertedBy.trim() : ''
+  if (!reason || !generatedAt || !workspaceRoot || !releaseScope || !assertedBy) return null
+  return {
+    schema: 'medscale.no_model_usage_attestation.v1',
+    status: 'attested',
+    generatedAt,
+    workspaceRoot,
+    releaseScope,
+    reason,
+    assertedBy,
+    evidence: Array.isArray(record.evidence)
+      ? record.evidence.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      : [],
+  }
+}
+
+export function readTargetNoModelUsageAttestation(projectDir: string = PROJECT_DIR): TargetNoModelUsageAttestation | null {
+  const root = resolveTargetWorkspaceRoot(projectDir)
+  const parsed = readJsonFile(targetNoModelUsageAttestationPath(root))
+  return parseNoModelUsageAttestation(parsed)
+}
+
+export function attestTargetNoModelUsage(options: {
+  projectDir?: string
+  releaseScope?: string
+  reason?: string
+  assertedBy?: string
+  evidence?: string[]
+} = {}): TargetNoModelUsageAttestation {
+  const root = resolveTargetWorkspaceRoot(options.projectDir ?? PROJECT_DIR)
+  const attestation: TargetNoModelUsageAttestation = {
+    schema: 'medscale.no_model_usage_attestation.v1',
+    status: 'attested',
+    generatedAt: new Date().toISOString(),
+    workspaceRoot: root,
+    releaseScope: String(options.releaseScope ?? 'release-readiness').trim() || 'release-readiness',
+    reason: String(options.reason ?? 'No model provider call was executed during this release readiness run.').trim(),
+    assertedBy: String(options.assertedBy ?? process.env.USERNAME ?? process.env.USER ?? 'unknown').trim() || 'unknown',
+    evidence: options.evidence?.map(item => item.trim()).filter(Boolean) ?? [],
+  }
+  if (!attestation.reason) {
+    throw new Error('No-model-usage attestation requires a non-empty reason.')
+  }
+  const path = targetNoModelUsageAttestationPath(root)
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, JSON.stringify(attestation, null, 2) + '\n', 'utf-8')
+  return attestation
 }
 
 function buildMedicalUsageLanes(records: ModelUsageReport['records']): TargetTokenCostLane[] {
@@ -385,6 +490,7 @@ export function buildTargetTokenCostReport(options: {
     sessionId: options.sessionId,
     limit: options.limit,
   })
+  const noModelUsageAttestation = readTargetNoModelUsageAttestation(root) ?? undefined
   const status: TargetTokenCostReport['status'] = report.summary.totalRecords > 0 ? 'ready' : 'pending'
   return {
     schema: 'medscale.token_cost.v1',
@@ -392,6 +498,7 @@ export function buildTargetTokenCostReport(options: {
     generatedAt: report.generatedAt,
     workspaceRoot: root,
     usagePath: targetUsagePath(root),
+    noModelUsageAttestation,
     window: {
       day: options.day,
       since,
@@ -407,10 +514,15 @@ export function buildTargetTokenCostReport(options: {
     records: report.records,
     recommendations: status === 'ready'
       ? ['Review high-token medical lanes before expert handoff and package delivery.']
-      : [
+      : noModelUsageAttestation
+        ? [
+            'No model usage was attested for this release scope; do not claim model cost review for this run.',
+            'Record provider usage with `medscale token record` when future workflow steps call a model.',
+          ]
+        : [
           'Record model usage for literature review, fact check, package audit, agent review, and memory settlement.',
           'Use `medscale token record --provider <name> --usage-json <json>` after model calls.',
-    ],
+      ],
   }
 }
 
@@ -1093,14 +1205,17 @@ function buildRuntimeTokenCostCard(root: string): TargetRuntimeReadinessCard {
     `cache_savings_tokens=${report.summary.cacheSavingsTokens}`,
     `estimated_cost_usd=${cost ?? 'unknown'}`,
     `medical_lanes=${report.byMedicalLane.length ? report.byMedicalLane.map(lane => lane.key).join(',') : 'none'}`,
+    `no_model_usage_attestation=${report.noModelUsageAttestation ? 'present' : 'missing'}`,
   ]
-  if (report.summary.totalRecords === 0) {
+  if (report.summary.totalRecords === 0 || report.summary.totalTokens === 0) {
     return runtimeCard(
       'token_cost',
       'Token and cost ledger',
       'warning',
       'COST PENDING',
-      'MedSCALE token/cost reporting is wired, but no medical model usage has been recorded yet.',
+      report.summary.totalRecords === 0
+        ? 'MedSCALE token/cost reporting is wired, but no medical model usage has been recorded yet.'
+        : 'MedSCALE token/cost reporting has records, but no non-zero model tokens have been recorded yet.',
       details,
       'Record usage with medscale token record after literature review, fact check, package audit, agent review, and memory settlement.',
       false,
@@ -1118,38 +1233,65 @@ function buildRuntimeTokenCostCard(root: string): TargetRuntimeReadinessCard {
   )
 }
 
-function buildRuntimeMedicalRetrievalCard(root: string, platform: ResolvedTargetPlatform | null): TargetRuntimeReadinessCard {
+function buildRuntimeMedicalRetrievalCard(
+  root: string,
+  platform: ResolvedTargetPlatform | null,
+  env: NodeJS.ProcessEnv,
+): TargetRuntimeReadinessCard {
   const platformDir = platform?.platformDir ?? join(root, 'target-research-platform')
   const pubmedClient = join(platformDir, 'src', 'api_clients', 'pubmed_client.py')
   const openalexClient = join(platformDir, 'src', 'api_clients', 'openalex_client.py')
+  const openfdaClient = join(platformDir, 'src', 'api_clients', 'openfda_client.py')
+  const patentsviewClient = join(platformDir, 'src', 'api_clients', 'patentsview_client.py')
   const literatureTests = join(platformDir, 'tests', 'test_literature_enrichment.py')
   const apiClientTests = join(platformDir, 'tests', 'test_api_clients.py')
+  const patentApiKeyPresent = Boolean(env.PATENTSVIEW_API_KEY || env.USPTO_API_KEY)
   const details = [
     `pubmed_client=${existsSync(pubmedClient) ? 'present' : 'missing'}`,
     `openalex_client=${existsSync(openalexClient) ? 'present' : 'missing'}`,
+    `openfda_client=${existsSync(openfdaClient) ? 'present' : 'missing'}`,
+    `patentsview_client=${existsSync(patentsviewClient) ? 'present' : 'missing'}`,
+    `patent_api_key=${patentApiKeyPresent ? 'present' : 'missing'}`,
     `literature_tests=${existsSync(literatureTests) ? 'present' : 'missing'}`,
     `api_client_tests=${existsSync(apiClientTests) ? 'present' : 'missing'}`,
   ]
-  if (existsSync(pubmedClient) && existsSync(openalexClient) && (existsSync(literatureTests) || existsSync(apiClientTests))) {
+  const clientsPresent = existsSync(pubmedClient)
+    && existsSync(openalexClient)
+    && existsSync(openfdaClient)
+    && existsSync(patentsviewClient)
+  const testsPresent = existsSync(literatureTests) || existsSync(apiClientTests)
+  if (clientsPresent && testsPresent && patentApiKeyPresent) {
     return runtimeCard(
       'medical_retrieval',
-      'PubMed / OpenAlex retrieval',
+      'Medical evidence retrieval',
       'pass',
       'RETRIEVAL READY',
-      'PubMed and OpenAlex clients are present with test coverage for literature enrichment.',
+      'Literature, regulatory-label, and patent retrieval clients are present with required patent credentials.',
       details,
-      'Next: add live availability and rate-limit checks when credentials/network policy allow it.',
+      'Next: run strict evidence self-tests before delivery.',
+      false,
+    )
+  }
+  if (clientsPresent && testsPresent && !patentApiKeyPresent) {
+    return runtimeCard(
+      'medical_retrieval',
+      'Medical evidence retrieval',
+      'warning',
+      'PATENT KEY MISSING',
+      'Patent evidence retrieval is wired, but USPTO/PatentsView credentials are not configured.',
+      details,
+      'Set PATENTSVIEW_API_KEY or USPTO_API_KEY before claiming patent landscape evidence.',
       false,
     )
   }
   return runtimeCard(
     'medical_retrieval',
-    'PubMed / OpenAlex retrieval',
+    'Medical evidence retrieval',
     'warning',
     'RETRIEVAL PARTIAL',
-    'Medical retrieval clients or enrichment tests are missing from the native workflow.',
+    'Medical retrieval clients, patent/regulatory evidence clients, or enrichment tests are missing from the native workflow.',
     details,
-    'Add PubMed/OpenAlex clients and literature enrichment tests before external evidence review.',
+    'Add PubMed/OpenAlex/openFDA/PatentsView clients and retrieval tests before external evidence review.',
     false,
   )
 }
@@ -1282,6 +1424,18 @@ function runtimeReadinessScore(cards: TargetRuntimeReadinessCard[]): number {
   return Math.round(cards.reduce((sum, card) => sum + weights[card.state], 0) / cards.length)
 }
 
+function releaseReadinessCheck(
+  id: string,
+  title: string,
+  state: TargetReleaseReadinessCheck['state'],
+  statusLabel: string,
+  summary: string,
+  details: string[],
+  nextAction: string,
+): TargetReleaseReadinessCheck {
+  return { id, title, state, statusLabel, summary, details, nextAction }
+}
+
 export function buildTargetRuntimeReadiness(
   projectDir: string = PROJECT_DIR,
   env: NodeJS.ProcessEnv = process.env,
@@ -1295,7 +1449,7 @@ export function buildTargetRuntimeReadiness(
     buildRuntimeSkillsCard(root),
     buildRuntimeMcpCard(root),
     buildRuntimeTokenCostCard(root),
-    buildRuntimeMedicalRetrievalCard(root, platform),
+    buildRuntimeMedicalRetrievalCard(root, platform, env),
     buildRuntimePackageAuditCard(root, platform),
     buildRuntimeFigureRefsCard(root, platform),
     buildRuntimeMedicalWorkflowCard(root, platform),
@@ -1321,6 +1475,228 @@ export function buildTargetRuntimeReadiness(
     failCount,
     cards,
     recommendations: recommendations.length ? recommendations.slice(0, 6) : ['Run the native MedSCALE doctor before external expert review.'],
+  }
+}
+
+function buildRuntimeReleaseCheck(readiness: TargetRuntimeReadiness): TargetReleaseReadinessCheck {
+  const details = [
+    `runtime_status=${readiness.status}`,
+    `score=${readiness.score}`,
+    `warning_count=${readiness.warningCount}`,
+    `fail_count=${readiness.failCount}`,
+  ]
+  if (readiness.status === 'ready') {
+    return releaseReadinessCheck(
+      'runtime_readiness',
+      'Runtime doctor',
+      'pass',
+      'RUNTIME READY',
+      'MedSCALE runtime doctor is fully ready.',
+      details,
+      'Continue with release verification and package dry-run.',
+    )
+  }
+  if (readiness.status === 'degraded' && readiness.failCount === 0) {
+    return releaseReadinessCheck(
+      'runtime_readiness',
+      'Runtime doctor',
+      'warning',
+      'RUNTIME DEGRADED',
+      'MedSCALE runtime doctor has warnings; release may proceed only if explicit release blockers are clear.',
+      details,
+      'Review npm run medscale -- target doctor --json and document any remaining warning before tagging.',
+    )
+  }
+  return releaseReadinessCheck(
+    'runtime_readiness',
+    'Runtime doctor',
+    'fail',
+    readiness.status === 'blocked' ? 'RUNTIME BLOCKED' : 'RUNTIME DEGRADED',
+    `MedSCALE runtime doctor is ${readiness.status}; release requires ready.`,
+    details,
+    'Run npm run medscale -- target doctor --json and resolve every warning/failure before tagging.',
+  )
+}
+
+function buildTokenReleaseCheck(readiness: TargetRuntimeReadiness): TargetReleaseReadinessCheck {
+  const tokenCard = runtimeCardById(readiness, 'token_cost')
+  const details = tokenCard?.details ?? ['token_cost_card=missing']
+  const noModelUsageAttestation = readTargetNoModelUsageAttestation(readiness.workspaceRoot)
+  if (tokenCard?.state === 'pass') {
+    return releaseReadinessCheck(
+      'token_usage_ledger',
+      'Token usage ledger',
+      'pass',
+      'TOKEN USAGE RECORDED',
+      'At least one real medical model usage record is available for cost review.',
+      details,
+      'Review npm run medscale -- target token report --json before handoff.',
+    )
+  }
+  if (noModelUsageAttestation) {
+    return releaseReadinessCheck(
+      'token_usage_ledger',
+      'Token usage ledger',
+      'pass',
+      'NO MODEL USAGE ATTESTED',
+      'No model provider call was executed for this release scope, so no token/cost usage is available to record.',
+      [
+        ...details,
+        `attestation_scope=${noModelUsageAttestation.releaseScope}`,
+        `attestation_generated_at=${noModelUsageAttestation.generatedAt}`,
+        `attestation_asserted_by=${noModelUsageAttestation.assertedBy}`,
+        `attestation_reason=${noModelUsageAttestation.reason}`,
+      ],
+      'Do not claim model cost review for this run; record provider usage when future workflow steps call a model.',
+    )
+  }
+  return releaseReadinessCheck(
+    'token_usage_ledger',
+    'Token usage ledger',
+    'fail',
+    'TOKEN USAGE MISSING',
+    'Release requires real model token/cost usage records; synthetic filler records are not acceptable.',
+    details,
+    'Record provider usage with npm run medscale -- target token record --provider <name> --usage-json <json>.',
+  )
+}
+
+function buildPatentReleaseCheck(readiness: TargetRuntimeReadiness): TargetReleaseReadinessCheck {
+  const retrievalCard = runtimeCardById(readiness, 'medical_retrieval')
+  const patentKey = runtimeDetailValue(retrievalCard, 'patent_api_key')
+  const details = retrievalCard?.details ?? ['medical_retrieval_card=missing']
+  const patentClientPresent = details.includes('patentsview_client=present')
+  const regulatoryClientPresent = details.includes('openfda_client=present')
+  const retrievalTestsPresent = details.includes('api_client_tests=present') || details.includes('literature_tests=present')
+  if (retrievalCard?.state === 'pass' && patentKey === 'present') {
+    return releaseReadinessCheck(
+      'patent_evidence_credentials',
+      'Patent evidence credentials',
+      'pass',
+      'PATENT EVIDENCE READY',
+      'Patent retrieval credentials and medical retrieval clients are present.',
+      details,
+      'Run strict evidence self-tests before external delivery.',
+    )
+  }
+  if (patentKey === 'missing' && patentClientPresent && regulatoryClientPresent && retrievalTestsPresent) {
+    return releaseReadinessCheck(
+      'patent_evidence_credentials',
+      'Patent evidence credentials',
+      'warning',
+      'PATENT KEY NOT CONFIGURED',
+      'Patent retrieval is packaged but credentials are deployment-time configuration; do not claim live patent landscape evidence in this release.',
+      details,
+      'Document that users must set PATENTSVIEW_API_KEY or USPTO_API_KEY before running patent landscape analysis.',
+    )
+  }
+  return releaseReadinessCheck(
+    'patent_evidence_credentials',
+    'Patent evidence credentials',
+    'fail',
+    patentKey === 'missing' ? 'PATENT KEY MISSING' : 'RETRIEVAL NOT READY',
+    'Release requires traceable patent evidence retrieval before claiming patent landscape analysis.',
+    details,
+    'Set PATENTSVIEW_API_KEY or USPTO_API_KEY and rerun npm run medscale -- target doctor --json.',
+  )
+}
+
+function buildGitReleaseCheck(root: string, checkGit: boolean): TargetReleaseReadinessCheck {
+  if (!checkGit) {
+    return releaseReadinessCheck(
+      'git_worktree_clean',
+      'Git worktree',
+      'warning',
+      'GIT CHECK SKIPPED',
+      'Git cleanliness was skipped by caller; do not use this mode before tagging.',
+      ['git_check=skipped'],
+      'Run npm run medscale -- target release-check --json without --skip-git before release.',
+    )
+  }
+
+  const result = spawnSync('git', ['-C', root, 'status', '--porcelain=v1', '--untracked-files=all'], {
+    encoding: 'utf-8',
+  })
+  if (result.error || result.status !== 0) {
+    return releaseReadinessCheck(
+      'git_worktree_clean',
+      'Git worktree',
+      'fail',
+      'GIT STATUS FAILED',
+      'Release requires a readable git worktree status.',
+      [
+        `git_status=${result.status ?? 'error'}`,
+        `error=${result.error?.message ?? 'none'}`,
+        `stderr=${(result.stderr ?? '').trim() || 'none'}`,
+      ],
+      'Run git status --short --untracked-files=all and resolve repository state before tagging.',
+    )
+  }
+
+  const entries = (result.stdout ?? '').split(/\r?\n/).filter(Boolean)
+  if (entries.length > 0) {
+    return releaseReadinessCheck(
+      'git_worktree_clean',
+      'Git worktree',
+      'fail',
+      'WORKTREE DIRTY',
+      'Release requires a clean reviewed worktree; uncommitted, staged, or untracked files are present.',
+      [
+        `changed_files=${entries.length}`,
+        ...entries.slice(0, 25).map(entry => `status=${entry}`),
+        ...(entries.length > 25 ? [`status_preview_truncated=${entries.length - 25}`] : []),
+      ],
+      'Commit reviewed changes only, remove generated artifacts, and rerun release-check before tagging.',
+    )
+  }
+
+  return releaseReadinessCheck(
+    'git_worktree_clean',
+    'Git worktree',
+    'pass',
+    'WORKTREE CLEAN',
+    'No uncommitted, staged, or untracked files were reported by git status.',
+    ['changed_files=0'],
+    'Continue with npm pack --dry-run and tag creation after full release checks pass.',
+  )
+}
+
+export function buildTargetReleaseReadiness(options: {
+  projectDir?: string
+  env?: NodeJS.ProcessEnv
+  checkGit?: boolean
+} = {}): TargetReleaseReadiness {
+  const root = resolveTargetWorkspaceRoot(options.projectDir ?? PROJECT_DIR)
+  const env = options.env ?? process.env
+  const runtimeReadiness = buildTargetRuntimeReadiness(root, env)
+  const checks = [
+    buildRuntimeReleaseCheck(runtimeReadiness),
+    buildTokenReleaseCheck(runtimeReadiness),
+    buildPatentReleaseCheck(runtimeReadiness),
+    buildGitReleaseCheck(root, options.checkGit ?? true),
+  ]
+  const blockers = checks
+    .filter(check => check.state === 'fail')
+    .map(check => `${check.id}: ${check.summary}`)
+  const warnings = checks
+    .filter(check => check.state === 'warning')
+    .map(check => `${check.id}: ${check.summary}`)
+  const recommendations = [...new Set([
+    ...checks.filter(check => check.state !== 'pass').map(check => check.nextAction),
+    ...runtimeReadiness.recommendations,
+  ])].slice(0, 8)
+
+  return {
+    schema: 'medscale.release_readiness.v1',
+    ok: blockers.length === 0,
+    status: blockers.length === 0 ? 'ready' : 'blocked',
+    generatedAt: new Date().toISOString(),
+    workspaceRoot: root,
+    runtimeReadiness,
+    checks,
+    blockers,
+    warnings,
+    recommendations,
   }
 }
 
@@ -1856,14 +2232,14 @@ function buildTargetSetupCapabilities(options: {
     }),
     setupCapability({
       id: 'pubmed-openalex',
-      title: 'PubMed / OpenAlex',
+      title: 'Medical evidence retrieval',
       category: 'medical-evidence',
       status: setupStatusFromRuntimeState(retrievalCard),
       required: true,
       summary: targetText(
         lang,
         '医学检索客户端已经存在，但尚未进入 native doctor 深度检查和首页能力图。',
-        'Medical retrieval clients exist, but they are not yet part of native doctor deep checks or the homepage capability map.',
+        'Medical literature, regulatory-label, and patent retrieval clients are inspected by native doctor.',
       ),
       evidence: retrievalCard?.details ?? [
         `pubmed_client=${existsSync(pubmedClient) ? 'present' : 'missing'}`,
@@ -1871,8 +2247,8 @@ function buildTargetSetupCapabilities(options: {
       ],
       installWindows: 'cd target-research-platform && python -m pip install -r requirements.txt',
       installUnix: 'cd target-research-platform && python -m pip install -r requirements.txt',
-      verifyWindows: 'cd target-research-platform && python -m pytest tests/test_literature* tests/test_*openalex*',
-      verifyUnix: 'cd target-research-platform && python -m pytest tests/test_literature* tests/test_*openalex*',
+      verifyWindows: 'cd target-research-platform && python -m pytest tests/test_literature* tests/test_api_clients.py::TestOpenFDAClient tests/test_api_clients.py::TestPatentsViewClient',
+      verifyUnix: 'cd target-research-platform && python -m pytest tests/test_literature* tests/test_api_clients.py::TestOpenFDAClient tests/test_api_clients.py::TestPatentsViewClient',
       nextAction: targetText(lang, '把 PubMed/OpenAlex 可用性、速率限制和缓存状态纳入 doctor。', 'Add PubMed/OpenAlex availability, rate-limit, and cache status to doctor.'),
       platform,
     }),
@@ -3346,6 +3722,54 @@ export const targetDoctorCommand = defineCommand({
   },
 })
 
+export const targetReleaseCheckCommand = defineCommand({
+  meta: {
+    name: 'release-check',
+    description: 'Check MedSCALE release readiness before tagging or npm publishing',
+  },
+  args: {
+    dir: { type: 'string', default: PROJECT_DIR, description: 'Project root directory' },
+    json: { type: 'boolean', default: false, description: 'Output as JSON' },
+    'skip-git': { type: 'boolean', default: false, description: 'Skip git worktree cleanliness check' },
+  },
+  run({ args }) {
+    const report = buildTargetReleaseReadiness({
+      projectDir: String(args.dir ?? PROJECT_DIR),
+      checkGit: !args['skip-git'],
+    })
+
+    if (args.json) {
+      console.log(JSON.stringify(report, null, 2))
+      process.exit(report.ok ? 0 : 1)
+    }
+
+    console.log('\nMedSCALE Release Readiness')
+    console.log('='.repeat(50))
+    console.log(`  Status: ${report.status}`)
+    console.log(`  Runtime: ${report.runtimeReadiness.status} (${report.runtimeReadiness.score})`)
+    console.log('\n  Checks:')
+    for (const check of report.checks) {
+      const mark = check.state === 'pass' ? 'PASS' : check.state === 'warning' ? 'WARN' : 'FAIL'
+      console.log(`    [${mark}] ${check.title}: ${check.statusLabel}`)
+      console.log(`      ${check.summary}`)
+    }
+    if (report.blockers.length > 0) {
+      console.log('\n  Blockers:')
+      for (const blocker of report.blockers) console.log(`    - ${blocker}`)
+    }
+    if (report.warnings.length > 0) {
+      console.log('\n  Warnings:')
+      for (const warning of report.warnings) console.log(`    - ${warning}`)
+    }
+    if (report.recommendations.length > 0) {
+      console.log('\n  Next:')
+      for (const item of report.recommendations) console.log(`    - ${item}`)
+    }
+
+    process.exit(report.ok ? 0 : 1)
+  },
+})
+
 export const targetOsPlanCommand = defineCommand({
   meta: {
     name: 'os-plan',
@@ -3522,6 +3946,38 @@ export const targetTokenCommand = defineCommand({
         console.log(`  Tokens: input ${record.inputTokens}, output ${record.outputTokens}, total ${record.totalTokens}`)
         if (record.cacheSavingsTokens > 0) console.log(`  Cache savings: ${record.cacheSavingsTokens} tokens`)
         if (record.estimatedCostUsd !== undefined) console.log(`  Estimated cost: $${record.estimatedCostUsd.toFixed(6)}`)
+      },
+    }),
+    'attest-no-usage': defineCommand({
+      meta: { name: 'attest-no-usage', description: 'Attest that a release scope made no model provider calls' },
+      args: {
+        dir: { type: 'string', default: PROJECT_DIR, description: 'Project root directory' },
+        scope: { type: 'string', default: 'release-readiness', description: 'Release or verification scope covered by this attestation' },
+        reason: {
+          type: 'string',
+          default: 'No model provider call was executed during this release readiness run.',
+          description: 'Reason why no token usage exists',
+        },
+        'asserted-by': { type: 'string', description: 'Person or agent asserting this no-usage scope' },
+        evidence: { type: 'string', description: 'Comma/semicolon separated evidence commands or notes' },
+        json: { type: 'boolean', default: false, description: 'Output machine-readable JSON' },
+      },
+      run({ args }) {
+        const attestation = attestTargetNoModelUsage({
+          projectDir: String(args.dir ?? PROJECT_DIR),
+          releaseScope: String(args.scope ?? 'release-readiness'),
+          reason: String(args.reason ?? 'No model provider call was executed during this release readiness run.'),
+          assertedBy: args['asserted-by'] ? String(args['asserted-by']) : undefined,
+          evidence: parseStringList(args.evidence),
+        })
+        if (args.json) {
+          console.log(JSON.stringify(attestation, null, 2))
+          return
+        }
+        console.log('MedSCALE no-model-usage attestation recorded')
+        console.log(`  Scope: ${attestation.releaseScope}`)
+        console.log(`  Reason: ${attestation.reason}`)
+        console.log(`  File: ${targetNoModelUsageAttestationPath(attestation.workspaceRoot)}`)
       },
     }),
     ingest: defineCommand({
@@ -4067,7 +4523,7 @@ export const targetPackageCommand = defineCommand({
 export const targetCommand = defineCommand({
   meta: {
     name: 'target',
-    description: 'Medical target research pipeline - analyze, manuscript, package, status, dashboard, doctor',
+    description: 'Medical target research pipeline - analyze, manuscript, package, status, dashboard, doctor, release-check',
   },
   subCommands: {
     analyze: targetAnalyzeCommand,
@@ -4079,6 +4535,7 @@ export const targetCommand = defineCommand({
     package: targetPackageCommand,
     status: targetStatusCommand,
     doctor: targetDoctorCommand,
+    'release-check': targetReleaseCheckCommand,
     'os-plan': targetOsPlanCommand,
     setup: targetSetupCommand,
     dashboard: targetDashboardCommand,

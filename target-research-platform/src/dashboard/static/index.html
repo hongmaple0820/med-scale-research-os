@@ -222,38 +222,6 @@
     .memory-review-actions .btn-secondary.pass { background: rgba(21,128,61,0.1); color: var(--ok); }
     .memory-review-actions .btn-secondary.warning { background: rgba(217,119,6,0.12); color: var(--warn); }
     .memory-review-actions .btn-secondary.fail { background: rgba(185,28,28,0.1); color: var(--fail); }
-    .genui-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
-    .genui-card {
-      display: grid; gap: 10px; padding: 16px; border-radius: 14px;
-      border: 1px solid var(--line); background: rgba(255,255,255,0.74);
-    }
-    .genui-card.pass { border-color: rgba(21,128,61,0.24); background: rgba(21,128,61,0.06); }
-    .genui-card.warning { border-color: rgba(217,119,6,0.32); background: rgba(217,119,6,0.07); }
-    .genui-card.fail { border-color: rgba(185,28,28,0.32); background: rgba(185,28,28,0.07); }
-    .genui-card.pending { border-color: rgba(148,163,184,0.34); background: rgba(148,163,184,0.08); }
-    .genui-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-    .genui-title { font-size: 14px; font-weight: 800; line-height: 1.35; }
-    .genui-schema { font-size: 11px; color: var(--muted); line-height: 1.4; word-break: break-word; }
-    .genui-controls { display: grid; gap: 8px; }
-    .genui-control {
-      display: grid; gap: 5px; padding: 8px; border-radius: 10px;
-      background: rgba(30,36,48,0.045); border: 1px solid rgba(30,36,48,0.06);
-    }
-    .genui-control strong { font-size: 12px; }
-    .genui-control small { color: var(--muted); line-height: 1.45; }
-    .genui-control input,
-    .genui-control select,
-    .genui-control textarea {
-      width: 100%; min-width: 0; border-radius: 8px; padding: 7px 8px;
-      border: 1px solid rgba(30,36,48,0.12); background: rgba(255,255,255,0.86);
-      font-size: 12px;
-    }
-    .genui-control textarea { resize: vertical; }
-    .genui-draft-note {
-      min-height: 18px; color: var(--muted); font-size: 12px; line-height: 1.45;
-    }
-    .genui-draft-note.ready { color: var(--ok); font-weight: 700; }
-    .genui-draft-note.blocked { color: var(--fail); font-weight: 700; }
     .readiness-card.warning { border-color: rgba(217,119,6,0.32); background: rgba(217,119,6,0.07); }
     .readiness-card.pass { border-color: rgba(21,128,61,0.24); background: rgba(21,128,61,0.06); }
     .readiness-card.fail { border-color: rgba(185,28,28,0.32); background: rgba(185,28,28,0.07); }
@@ -388,24 +356,6 @@
 
     <section class="panel" style="margin-bottom: 22px;">
       <div class="section">
-        <div class="os-header">
-          <div class="os-title-group">
-            <h2>GenUI Review Workbench</h2>
-            <div class="section-note">Review artifacts rendered as forms, controls, and decision cards. Medical decisions still require signed human review.</div>
-          </div>
-          <div class="os-score">
-            <div class="label">Cards</div>
-            <div id="genuiReviewCount" class="value">0</div>
-          </div>
-        </div>
-        <div id="genuiReviewWorkbench" class="genui-grid">
-          <div class="genui-card pending"><div class="mini-note">Waiting for review artifacts.</div></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel" style="margin-bottom: 22px;">
-      <div class="section">
         <h2>交付就绪度</h2>
         <div id="deliveryReadiness" class="readiness-grid">
           <div class="readiness-card"><div class="value">等待交付</div><div class="mini-note">运行或打包论文后，这里会展示质量门禁、事实核查、证据富化和人工审阅待办。</div></div>
@@ -513,7 +463,6 @@
     let reportBundle = null;
     let activeReportSection = null;
     let reviewActionInFlight = false;
-    let genuiDraftInFlight = false;
 
     if (window.marked) {
       marked.setOptions({ breaks: true, gfm: true });
@@ -634,177 +583,6 @@
 
     function renderOsList(items, renderItem) {
       return '<ul class="os-list">' + items.map(renderItem).join('') + '</ul>';
-    }
-
-    function renderGenuiControl(control) {
-      const enabled = control.enabled === true;
-      const enabledText = enabled ? "ready" : "locked";
-      const disabledAttr = enabled ? "" : " disabled";
-      if (control.type === "select") {
-        const options = Array.isArray(control.options) ? control.options : [];
-        return '<div class="genui-control"><strong>' + escapeHtml(control.label || control.id || "select") + '</strong>'
-          + '<small>' + escapeHtml(enabledText) + ' · ' + escapeHtml(String(options.length)) + ' option(s)</small>'
-          + '<select data-genui-field="' + escapeAttr(control.id || "") + '"' + disabledAttr + '>'
-          + options.map(option => '<option value="' + escapeAttr(option.value || "") + '">' + escapeHtml(option.label || option.value || "") + '</option>').join('')
-          + '</select></div>';
-      }
-      if (control.type === "textarea") {
-        return '<div class="genui-control"><strong>' + escapeHtml(control.label || control.id || "textarea") + '</strong>'
-          + '<small>' + escapeHtml(enabledText) + (control.required ? ' · required' : '') + '</small>'
-          + '<textarea data-genui-field="' + escapeAttr(control.id || "") + '" rows="3" placeholder="' + escapeAttr(control.label || "") + '"' + disabledAttr + '></textarea></div>';
-      }
-      if (control.type === "checkbox") {
-        return '<label class="genui-control"><span><input type="checkbox" data-genui-field="' + escapeAttr(control.id || "") + '"' + disabledAttr + '> ' + escapeHtml(control.label || control.id || "checkbox") + '</span>'
-          + '<small>' + escapeHtml(enabledText) + (control.required ? ' required' : '') + '</small></label>';
-      }
-      if (control.type === "field_group") {
-        const fields = Array.isArray(control.fields) ? control.fields : [];
-        return '<div class="genui-control"><strong>' + escapeHtml(control.id || "fields") + '</strong>'
-          + '<small>' + escapeHtml(enabledText) + ' · ' + escapeHtml(fields.join(", ")) + '</small></div>';
-      }
-      if (control.type === "button_group") {
-        const actions = Array.isArray(control.actions) ? control.actions : [];
-        return '<div class="genui-control"><strong>' + escapeHtml(control.id || "actions") + '</strong><div class="memory-review-actions">'
-          + actions.map(action => '<button type="button" class="btn-secondary" data-genui-review-action="' + escapeAttr(action) + '"' + (enabled && !genuiDraftInFlight ? '' : ' disabled') + '>' + escapeHtml(action) + '</button>').join('')
-          + '</div><small>' + escapeHtml(enabledText) + '</small></div>';
-      }
-      if (control.type === "button") {
-        return '<div class="genui-control"><button type="button" class="btn-secondary" data-genui-review-action="' + escapeAttr(control.id || "action") + '"' + (enabled && !genuiDraftInFlight ? '' : ' disabled') + '>' + escapeHtml(control.label || control.id || "action") + '</button><small>' + escapeHtml(enabledText) + '</small></div>';
-      }
-      return '<div class="genui-control"><strong>' + escapeHtml(control.id || control.type || "control") + '</strong><small>' + escapeHtml(enabledText) + '</small></div>';
-    }
-
-    function collectGenuiReviewFields(cardEl) {
-      const fields = {};
-      cardEl.querySelectorAll("[data-genui-field]").forEach(input => {
-        const key = input.dataset.genuiField || "";
-        if (!key) return;
-        const parts = key.split(".");
-        const value = input.type === "checkbox" ? input.checked === true : String(input.value || "").trim();
-        if (parts.length === 2) {
-          fields[parts[0]] = fields[parts[0]] || {};
-          fields[parts[0]][parts[1]] = value;
-        } else {
-          fields[key] = value;
-        }
-      });
-      return fields;
-    }
-
-    async function submitGenuiReviewActionDraft(button) {
-      const cardEl = button.closest(".genui-card");
-      if (!cardEl) return;
-      const noteEl = cardEl.querySelector("[data-genui-draft-result]");
-      const action = button.dataset.genuiReviewAction || "";
-      const artifactId = cardEl.dataset.genuiCardId || "";
-      genuiDraftInFlight = true;
-      if (noteEl) {
-        noteEl.className = "genui-draft-note";
-        noteEl.textContent = "Validating dry-run review draft...";
-      }
-      try {
-        const response = await fetch("/api/genui-review-action-draft", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({ artifact_id: artifactId, action, persist: true, fields: collectGenuiReviewFields(cardEl) }),
-        });
-        const data = await response.json();
-        if (!response.ok || !data.ok) {
-          if (noteEl) {
-            noteEl.className = "genui-draft-note blocked";
-            noteEl.textContent = "Draft blocked: " + (data.error || "validation failed");
-          }
-          formMessageEl.textContent = data.error || "GenUI review draft failed.";
-          return;
-        }
-        const entrypoint = data.proposed_operation?.entrypoint || action;
-        const saved = data.draft_artifact_id ? " / saved " + data.draft_artifact_id : "";
-        if (noteEl) {
-          noteEl.className = "genui-draft-note ready";
-          noteEl.textContent = "Dry-run draft ready: " + entrypoint + saved;
-        }
-        formMessageEl.textContent = "GenUI dry-run draft ready: " + entrypoint + saved;
-      } catch (error) {
-        if (noteEl) {
-          noteEl.className = "genui-draft-note blocked";
-          noteEl.textContent = "Draft failed: " + error.message;
-        }
-        formMessageEl.textContent = "GenUI review draft failed: " + error.message;
-      } finally {
-        genuiDraftInFlight = false;
-      }
-    }
-
-    async function submitGenuiReviewActionConfirmation(button) {
-      const cardEl = button.closest(".genui-card");
-      if (!cardEl) return;
-      const noteEl = cardEl.querySelector("[data-genui-draft-result]");
-      const draftArtifactId = cardEl.dataset.genuiCardId || "";
-      genuiDraftInFlight = true;
-      if (noteEl) {
-        noteEl.className = "genui-draft-note";
-        noteEl.textContent = "Saving confirmation envelope...";
-      }
-      try {
-        const response = await fetch("/api/genui-review-action-confirmation", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({ draft_artifact_id: draftArtifactId, fields: collectGenuiReviewFields(cardEl) }),
-        });
-        const data = await response.json();
-        if (!response.ok || !data.ok) {
-          if (noteEl) {
-            noteEl.className = "genui-draft-note blocked";
-            noteEl.textContent = "Confirmation blocked: " + (data.error || "validation failed");
-          }
-          formMessageEl.textContent = data.error || "GenUI confirmation failed.";
-          return;
-        }
-        const saved = data.confirmation_artifact_id ? "saved " + data.confirmation_artifact_id : "saved";
-        if (noteEl) {
-          noteEl.className = "genui-draft-note ready";
-          noteEl.textContent = "Confirmation envelope " + saved + ".";
-        }
-        formMessageEl.textContent = "GenUI confirmation envelope " + saved + ".";
-      } catch (error) {
-        if (noteEl) {
-          noteEl.className = "genui-draft-note blocked";
-          noteEl.textContent = "Confirmation failed: " + error.message;
-        }
-        formMessageEl.textContent = "GenUI confirmation failed: " + error.message;
-      } finally {
-        genuiDraftInFlight = false;
-      }
-    }
-
-    function renderGenuiReviewWorkbench(status) {
-      const container = document.getElementById("genuiReviewWorkbench");
-      const countEl = document.getElementById("genuiReviewCount");
-      if (!container) return;
-      const workbench = status.summary?.genui_review_workbench || status.summary?.medical_research_os?.genui_review_workbench || {};
-      const cards = Array.isArray(workbench.cards) ? workbench.cards : [];
-      if (countEl) countEl.textContent = String(workbench.card_count ?? cards.length ?? 0);
-      if (!cards.length) {
-        container.innerHTML = '<div class="genui-card pending"><div class="genui-top"><div><div class="genui-title">No review artifacts yet</div><div class="genui-schema">medscale.genui_review_workbench.v1</div></div><span class="os-chip pending">PENDING</span></div><div class="mini-note">Mapping requests, PubMed worksheets, and claim records will appear here after the governance pipeline creates them.</div></div>';
-        return;
-      }
-      container.innerHTML = cards.map(card => {
-        const details = Array.isArray(card.details) ? card.details : [];
-        const controls = Array.isArray(card.controls) ? card.controls : [];
-        const detailHtml = details.length
-          ? '<ul>' + details.slice(0, 8).map(item => '<li>' + escapeHtml(item) + '</li>').join('') + '</ul>'
-          : '';
-        const controlHtml = controls.length
-          ? '<div class="genui-controls">' + controls.map(renderGenuiControl).join('') + '</div>'
-          : '<div class="mini-note">No direct controls for this artifact.</div>';
-        return '<article class="genui-card ' + escapeHtml(card.state || 'pending') + '" data-genui-card-id="' + escapeAttr(card.id || '') + '" data-genui-card-schema="' + escapeAttr(card.schema || '') + '">'
-          + '<div class="genui-top"><div><div class="genui-title">' + escapeHtml(card.title || '') + '</div><div class="genui-schema">' + escapeHtml(card.schema || '') + '</div></div>'
-          + '<span class="os-chip ' + escapeHtml(card.state || 'pending') + '">' + escapeHtml(card.status_label || card.state || 'pending') + '</span></div>'
-          + detailHtml
-          + controlHtml
-          + '<div class="genui-draft-note" data-genui-draft-result></div>'
-          + '</article>';
-      }).join('');
     }
 
     function renderMedicalResearchOs(status) {
@@ -1122,7 +900,6 @@
             : "READY";
       document.getElementById("globalProgressFill").style.width = (status.progress_percent || 0) + "%";
       renderMedicalResearchOs(status);
-      renderGenuiReviewWorkbench(status);
       renderDeliveryReadiness(status);
       renderStages(status);
       renderLogs(status.logs || []);
@@ -1501,19 +1278,6 @@
       event.preventDefault();
       if (reviewActionInFlight || button.disabled) return;
       submitMemoryReviewAction(button);
-    });
-
-    document.addEventListener("click", event => {
-      const button = event.target.closest("[data-genui-review-action]");
-      if (!button) return;
-      event.preventDefault();
-      if (genuiDraftInFlight || button.disabled) return;
-      const card = button.closest(".genui-card");
-      if (card?.dataset.genuiCardSchema === "medscale.genui_review_action_draft.v1") {
-        submitGenuiReviewActionConfirmation(button);
-      } else {
-        submitGenuiReviewActionDraft(button);
-      }
     });
 
     // Init

@@ -30,7 +30,7 @@ export class WorkBuddyAdapter implements IAgentAdapter {
   }
 
   isInstalled(): boolean {
-    return existsSync(this.getSettingsPath())
+    return existsSync(join(this.projectDir, '.workbuddy'))
   }
 
   generateSettings(): SettingsJson {

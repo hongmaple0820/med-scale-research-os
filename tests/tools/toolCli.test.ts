@@ -30,7 +30,7 @@ async function runScale(args: string[], scaleDir: string, projectDir: string) {
   })
 }
 
-const CLI_TEST_TIMEOUT_MS = 60_000
+const CLI_TEST_TIMEOUT_MS = 30_000
 
 describe('tool CLI', () => {
   it('prints resolved tool policy as JSON', async () => {

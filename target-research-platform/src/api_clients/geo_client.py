@@ -210,7 +210,7 @@ class GEOClient(BaseAPIClient):
         self,
         disease: str,
         tissue: Optional[str] = None,
-        max_results: int = 20
+        max_results: int = 10
     ) -> APIResponse:
         """
         查找差异表达数据集
@@ -226,84 +226,32 @@ class GEOClient(BaseAPIClient):
         Returns:
             包含差异表达数据集的APIResponse
         """
+        # 优先搜索 RNA-seq 数据集（行ID是基因符号，无需探针映射）
         query_parts = [disease]
         if tissue:
             query_parts.append(tissue)
 
-        base_terms = " AND ".join(query_parts)
-        generic_query = (
-            f"{base_terms}"
-            " AND expression profiling by high throughput sequencing[gdstype]"
-            " AND Homo sapiens[orgn] AND gse[entry_type]"
-        )
-        clinical_hints = (
-            '"adjacent normal"',
-            '"normal tissue"',
-            '"matched normal"',
-            '"paired"',
-            '"tumour tissue"',
-            '"tumor tissue"',
-            '"patient"',
-        )
-        clinical_queries = [
-            (
-                f"{base_terms} AND {hint}"
-                " AND expression profiling by high throughput sequencing[gdstype]"
-                " AND Homo sapiens[orgn] AND gse[entry_type]"
-            )
-            for hint in clinical_hints
-        ]
+        query = " AND ".join(query_parts)
+        query += " AND expression profiling by high throughput sequencing[gdstype]"
+        query += " AND Homo sapiens[orgn] AND gse[entry_type]"
 
-        combined_ids: list[str] = []
-        total_count = 0
-
-        for query in (*clinical_queries, generic_query):
-            parsed = self._search_gds_terms(disease, query, max_results)
-            if not parsed.success:
-                continue
-            total_count = max(total_count, int(parsed.data.get("total_count", 0) or 0))
-            for dataset_id in parsed.data.get("dataset_ids", []):
-                if dataset_id not in combined_ids:
-                    combined_ids.append(dataset_id)
-            if len(combined_ids) >= max_results:
-                break
-
-        if combined_ids:
-            return APIResponse(
-                success=True,
-                data={
-                    "disease": disease,
-                    "query": " || ".join((*clinical_queries, generic_query)),
-                    "total_count": total_count,
-                    "returned_count": len(combined_ids[:max_results]),
-                    "dataset_ids": combined_ids[:max_results],
-                    "dataset_type": "rnaseq",
-                },
-                source=self.source_name,
-                endpoint="/esearch.fcgi",
-                params={"disease": disease},
-                timestamp="",
-            )
-
-        # 回退到微阵列数据集
-        return self._search_microarray_datasets(disease, tissue, max_results)
-
-    def _search_gds_terms(
-        self,
-        disease: str,
-        query: str,
-        max_results: int,
-    ) -> APIResponse:
         params = {
             "db": "gds",
             "term": query,
             "retmax": max_results,
-            "retmode": "json",
+            "retmode": "json"
         }
+
         response = self._make_request("GET", "/esearch.fcgi", params=params)
-        if not response.success:
-            return response
-        return self._parse_search_response(response, disease, query)
+
+        if response.success:
+            parsed = self._parse_search_response(response, disease, query)
+            if parsed.success and parsed.data.get("total_count", 0) > 0:
+                parsed.data["dataset_type"] = "rnaseq"
+                return parsed
+
+        # 回退到微阵列数据集
+        return self._search_microarray_datasets(disease, tissue, max_results)
 
     def _search_microarray_datasets(
         self,
@@ -512,7 +460,7 @@ class GEOClient(BaseAPIClient):
                         continue
                     unquoted = stripped.strip('"')
                     if unquoted.startswith("ID_REF"):
-                        continue
+                        return True
                     parts = stripped.split("\t")
                     if len(parts) > 1:
                         probe = parts[0].strip('"')
@@ -546,9 +494,6 @@ class GEOClient(BaseAPIClient):
 
         for ds in datasets:
             score = 0
-            text = " ".join(
-                [ds.get("title", ""), ds.get("summary", ""), ds.get("dataset_type", "")]
-            ).lower()
 
             # 样本量得分
             sample_count = ds.get("sample_count", 0)
@@ -570,48 +515,6 @@ class GEOClient(BaseAPIClient):
             title = ds.get("title", "").lower()
             if disease.lower() in title:
                 score += 2
-            if any(token in text for token in ("adjacent normal", "matched normal")):
-                score += 8
-            elif any(token in text for token in ("normal tissue", "paired")):
-                score += 6
-            if any(
-                token in text
-                for token in (
-                    "tumour tissue",
-                    "tumor tissue",
-                    "patient",
-                    "patients",
-                    "cohort",
-                    "clinical",
-                )
-            ):
-                score += 4
-            if any(
-                token in text
-                for token in (
-                    "cell line",
-                    "xenograft",
-                    "organoid",
-                    "single cell",
-                    "single-cell",
-                    "scrna",
-                    "knockdown",
-                    "knockout",
-                    "overexpression",
-                    "on-treatment",
-                    "pre-treatment",
-                    "post-treatment",
-                    "treated with",
-                    "sirna",
-                    "crispr",
-                    "pbmc",
-                    "plasma",
-                    "metastasis",
-                    "brain metast",
-                    "spatial transcriptomic",
-                )
-            ):
-                score -= 4
 
             # 有PubMed文献支持
             if ds.get("pubmed_ids"):
@@ -642,209 +545,101 @@ class GEOClient(BaseAPIClient):
         """
         import requests as req
 
+        # 构建 URL
+        # GSE12345 → GSE12nnn
         num = int(geo_accession.replace("GSE", ""))
         series_dir = f"GSE{num // 1000}nnn"
         base_url = f"https://ftp.ncbi.nlm.nih.gov/geo/series/{series_dir}/{geo_accession}/matrix"
 
+        # 尝试下载
         output_path = Path(output_dir) if output_dir else Path(tempfile.gettempdir())
         output_path.mkdir(parents=True, exist_ok=True)
 
         file_path = output_path / f"{geo_accession}_series_matrix.txt.gz"
-        metadata_file = str(file_path) if file_path.exists() else None
 
-        if file_path.exists() and self.series_matrix_has_expression_table(str(file_path)):
-            return APIResponse(
-                success=True,
-                data={
-                    "file_path": str(file_path),
-                    "accession": geo_accession,
-                    "format": "series_matrix",
-                    "metadata_file": str(file_path),
-                },
-                source=self.source_name,
-                endpoint=base_url,
-                params={"accession": geo_accession},
-                timestamp="",
-            )
-
-        matrix_error = None
+        # 检查缓存（无效 SuperSeries 缓存需剔除）
+        if file_path.exists():
+            if self.series_matrix_has_expression_table(str(file_path)):
+                return APIResponse(
+                    success=True,
+                    data={"file_path": str(file_path), "accession": geo_accession},
+                    source=self.source_name,
+                    endpoint=base_url,
+                    params={"accession": geo_accession},
+                    timestamp=""
+                )
+            try:
+                file_path.unlink()
+            except OSError:
+                pass
 
         try:
+            # 先获取目录列表找到确切文件名
             dir_resp = req.get(base_url + "/", timeout=30)
             dir_resp.raise_for_status()
+
+            # 查找 series_matrix.txt.gz（兼容 GSE12345 与 GSE12345-GPLxxxx 命名）
             candidates = re.findall(
                 rf'({re.escape(geo_accession)}(?:-GPL\d+)?_series_matrix\.txt\.gz)',
                 dir_resp.text,
             )
-
-            if candidates:
-                filename = max(
-                    set(candidates),
-                    key=lambda name: self._size_hint_from_listing(dir_resp.text, name),
-                )
-                file_url = f"{base_url}/{filename}"
-                self._wait_for_rate_limit()
-                dl_resp = req.get(file_url, timeout=120, stream=True)
-                dl_resp.raise_for_status()
-
-                with open(file_path, "wb") as f:
-                    for chunk in dl_resp.iter_content(chunk_size=8192):
-                        f.write(chunk)
-
-                metadata_file = str(file_path)
-                if self.series_matrix_has_expression_table(str(file_path)):
-                    return APIResponse(
-                        success=True,
-                        data={
-                            "file_path": str(file_path),
-                            "accession": geo_accession,
-                            "format": "series_matrix",
-                            "metadata_file": str(file_path),
-                        },
-                        source=self.source_name,
-                        endpoint=file_url,
-                        params={"accession": geo_accession},
-                        timestamp="",
-                    )
-
-                matrix_error = (
-                    f"{geo_accession} series matrix metadata is present, but expression rows are missing"
-                )
-            else:
-                matrix_error = f"未找到 {geo_accession} 的 series matrix 文件"
-        except Exception as exc:
-            matrix_error = f"下载 series matrix 失败: {exc}"
-
-        supplement = self._download_processed_supplement(
-            geo_accession,
-            series_dir,
-            output_path,
-            metadata_file=metadata_file,
-        )
-        if supplement.success:
-            return supplement
-
-        return APIResponse(
-            success=False,
-            data=None,
-            source=self.source_name,
-            endpoint=base_url,
-            params={"accession": geo_accession},
-            timestamp="",
-            error=supplement.error or matrix_error or f"下载失败: {geo_accession}",
-        )
-
-    @staticmethod
-    def _size_hint_from_listing(listing: str, name: str) -> int:
-        pattern = rf'{re.escape(name)}</a>\s+[\d-]+\s+[\d:]+\s+([\d.]+)([KMG]?)'
-        match = re.search(pattern, listing)
-        if not match:
-            return 0
-        value = float(match.group(1))
-        unit = match.group(2).upper()
-        multiplier = {"K": 1024, "M": 1024 ** 2, "G": 1024 ** 3}.get(unit, 1)
-        return int(value * multiplier)
-
-    @staticmethod
-    def _score_processed_matrix_candidate(name: str) -> int:
-        lower_name = name.lower()
-        valid_suffixes = (".txt", ".txt.gz", ".csv", ".csv.gz", ".tsv", ".tsv.gz")
-        if not lower_name.endswith(valid_suffixes):
-            return -1
-        if any(
-            token in lower_name
-            for token in ("raw", ".tar", "filelist", "read_me", "readme", "metadata")
-        ):
-            return -1
-        if any(token in lower_name for token in ("deg", "logfc", "volcano", "summary")):
-            return -1
-
-        score = 0
-        for token, points in (
-            ("log2rpkm", 10),
-            ("logcpm", 10),
-            ("tpmlog2", 10),
-            ("rpkm", 8),
-            ("tpm", 8),
-            ("fpkm", 8),
-            ("count", 7),
-            ("expression", 6),
-            ("matrix", 5),
-            ("annot", 1),
-        ):
-            if token in lower_name:
-                score += points
-        return score
-
-    def _download_processed_supplement(
-        self,
-        geo_accession: str,
-        series_dir: str,
-        output_path: Path,
-        metadata_file: Optional[str] = None,
-    ) -> APIResponse:
-        import requests as req
-
-        suppl_url = f"https://ftp.ncbi.nlm.nih.gov/geo/series/{series_dir}/{geo_accession}/suppl"
-
-        try:
-            dir_resp = req.get(suppl_url + "/", timeout=30)
-            dir_resp.raise_for_status()
-            hrefs = re.findall(r'href="([^"]+)"', dir_resp.text)
-            candidates = []
-            for href in hrefs:
-                name = Path(href).name
-                score = self._score_processed_matrix_candidate(name)
-                if score < 0:
-                    continue
-                size = self._size_hint_from_listing(dir_resp.text, name)
-                candidates.append((score, size, name))
-
             if not candidates:
                 return APIResponse(
-                    success=False,
-                    data=None,
-                    source=self.source_name,
-                    endpoint=suppl_url,
-                    params={"accession": geo_accession},
+                    success=False, data=None, source=self.source_name,
+                    endpoint=base_url, params={"accession": geo_accession},
                     timestamp="",
-                    error=f"{geo_accession} has no processed supplementary expression matrix",
+                    error=f"未找到 {geo_accession} 的 series matrix 文件"
                 )
 
-            _, _, filename = max(candidates)
-            file_url = f"{suppl_url}/{filename}"
-            dest_path = output_path / filename
+            def _size_hint(name: str) -> int:
+                pattern = rf'{re.escape(name)}</a>\s+[\d-]+\s+[\d:]+\s+([\d.]+)([KMG]?)'
+                m = re.search(pattern, dir_resp.text)
+                if not m:
+                    return 0
+                value = float(m.group(1))
+                unit = m.group(2).upper()
+                multiplier = {"K": 1024, "M": 1024 ** 2, "G": 1024 ** 3}.get(unit, 1)
+                return int(value * multiplier)
 
-            if not dest_path.exists():
-                self._wait_for_rate_limit()
-                dl_resp = req.get(file_url, timeout=120, stream=True)
-                dl_resp.raise_for_status()
-                with open(dest_path, "wb") as f:
-                    for chunk in dl_resp.iter_content(chunk_size=8192):
-                        f.write(chunk)
+            filename = max(set(candidates), key=_size_hint)
+            file_url = f"{base_url}/{filename}"
+
+            # 下载文件
+            self._wait_for_rate_limit()
+            dl_resp = req.get(file_url, timeout=120, stream=True)
+            dl_resp.raise_for_status()
+
+            with open(file_path, 'wb') as f:
+                for chunk in dl_resp.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            if not self.series_matrix_has_expression_table(str(file_path)):
+                try:
+                    file_path.unlink()
+                except OSError:
+                    pass
+                return APIResponse(
+                    success=False, data=None, source=self.source_name,
+                    endpoint=file_url, params={"accession": geo_accession},
+                    timestamp="",
+                    error=f"{geo_accession} 下载文件无表达矩阵（可能为 SuperSeries）"
+                )
 
             return APIResponse(
                 success=True,
-                data={
-                    "file_path": str(dest_path),
-                    "accession": geo_accession,
-                    "format": "supplement",
-                    "metadata_file": metadata_file,
-                },
+                data={"file_path": str(file_path), "accession": geo_accession},
                 source=self.source_name,
                 endpoint=file_url,
                 params={"accession": geo_accession},
-                timestamp="",
+                timestamp=""
             )
-        except Exception as exc:
+
+        except Exception as e:
             return APIResponse(
-                success=False,
-                data=None,
-                source=self.source_name,
-                endpoint=suppl_url,
-                params={"accession": geo_accession},
+                success=False, data=None, source=self.source_name,
+                endpoint=base_url, params={"accession": geo_accession},
                 timestamp="",
-                error=f"下载 processed supplement 失败: {exc}",
+                error=f"下载失败: {str(e)}"
             )
 
     def download_platform_annotation(
@@ -1225,270 +1020,12 @@ class GEOClient(BaseAPIClient):
 
         return probe_map
 
-    @staticmethod
-    def _looks_like_geo_soft_file(file_path: str) -> bool:
-        open_func = gzip.open if file_path.endswith(".gz") else open
-        mode = "rt" if file_path.endswith(".gz") else "r"
-        try:
-            with open_func(file_path, mode, encoding="utf-8", errors="replace") as handle:
-                for _ in range(10):
-                    line = handle.readline()
-                    if not line:
-                        break
-                    stripped = line.strip()
-                    if not stripped:
-                        continue
-                    return stripped.startswith(("!", "^", "#"))
-        except OSError:
-            return False
-        return False
-
-    def _extract_series_metadata(self, file_path: Optional[str]) -> dict:
-        if not file_path or not Path(file_path).exists():
-            return {}
-
-        open_func = gzip.open if file_path.endswith(".gz") else open
-        mode = "rt" if file_path.endswith(".gz") else "r"
-        metadata: dict = {}
-
-        try:
-            with open_func(file_path, mode, encoding="utf-8", errors="replace") as handle:
-                for raw_line in handle:
-                    line = raw_line.strip()
-                    if line.startswith("!series_matrix_table_begin") or line.startswith("!sample_table_begin"):
-                        break
-                    if line.startswith("!Sample_title"):
-                        parts = line.split("\t")
-                        metadata["_titles"] = [p.strip('"') for p in parts[1:]]
-                    elif line.startswith("!Sample_geo_accession"):
-                        parts = line.split("\t")
-                        metadata["_accessions"] = [p.strip('"') for p in parts[1:]]
-                    elif line.startswith("!Sample_source_name_ch1"):
-                        parts = line.split("\t")
-                        metadata["_source_names"] = [p.strip('"') for p in parts[1:]]
-                    elif line.startswith("!Sample_characteristics_ch1"):
-                        parts = line.split("\t")
-                        char_values = [p.strip('"') for p in parts[1:]]
-                        metadata.setdefault("_characteristics_list", {})
-                        for index, value in enumerate(char_values):
-                            metadata["_characteristics_list"].setdefault(index, []).append(value)
-                    elif line.startswith("!Sample_group"):
-                        parts = line.split("\t")
-                        metadata["_groups"] = [p.strip('"') for p in parts[1:]]
-                    elif line.startswith("!Sample_platform_id") or line.startswith("!Series_platform_id"):
-                        parts = line.split("\t")
-                        if len(parts) > 1:
-                            metadata["platform"] = parts[1].strip('"')
-        except OSError:
-            return {}
-
-        return metadata
-
-    def _build_sample_metadata(
-        self,
-        sample_ids: list[str],
-        metadata: Optional[dict],
-    ) -> dict:
-        metadata = metadata or {}
-        accessions = metadata.get("_accessions", [])
-        titles = metadata.get("_titles", [])
-        source_names = metadata.get("_source_names", [])
-        groups = metadata.get("_groups", [])
-        char_lists = metadata.get("_characteristics_list", {})
-
-        accession_lookup = {value: index for index, value in enumerate(accessions)}
-        title_lookup = {value: index for index, value in enumerate(titles)}
-        positional_alignment = any(
-            len(values) == len(sample_ids)
-            for values in (accessions, titles, source_names, groups)
-            if values
-        )
-
-        sample_metadata = {}
-        for index, sample_id in enumerate(sample_ids):
-            meta_index = accession_lookup.get(sample_id)
-            if meta_index is None:
-                meta_index = title_lookup.get(sample_id)
-            if meta_index is None and positional_alignment:
-                meta_index = index
-
-            merged_chars = ""
-            title = sample_id
-            source_name = ""
-            group = ""
-            accession = sample_id
-
-            if meta_index is not None:
-                merged_chars = "; ".join(char_lists.get(meta_index, []))
-                if meta_index < len(titles) and titles[meta_index]:
-                    title = titles[meta_index]
-                if meta_index < len(source_names):
-                    source_name = source_names[meta_index]
-                if meta_index < len(groups):
-                    group = groups[meta_index]
-                if meta_index < len(accessions) and accessions[meta_index]:
-                    accession = accessions[meta_index]
-
-            sample_metadata[sample_id] = {
-                "title": title,
-                "characteristics": merged_chars,
-                "source_name": source_name,
-                "group": group,
-                "accession": accession,
-            }
-
-        return sample_metadata
-
-    @staticmethod
-    def _detect_delimiter(file_path: str) -> str:
-        open_func = gzip.open if file_path.endswith(".gz") else open
-        mode = "rt" if file_path.endswith(".gz") else "r"
-        with open_func(file_path, mode, encoding="utf-8", errors="replace") as handle:
-            for line in handle:
-                stripped = line.strip()
-                if not stripped:
-                    continue
-                return "," if stripped.count(",") >= stripped.count("\t") else "\t"
-        return "\t"
-
-    @staticmethod
-    def _accession_from_file(file_path: str, metadata_file: Optional[str] = None) -> str:
-        for candidate in (metadata_file, file_path):
-            if not candidate:
-                continue
-            match = re.search(r"(GSE\d+)", Path(candidate).name)
-            if match:
-                return match.group(1)
-        return Path(file_path).stem
-
-    def _parse_processed_expression_file(
-        self,
-        file_path: str,
-        target_genes: Optional[list[str]] = None,
-        metadata_file: Optional[str] = None,
-    ) -> APIResponse:
-        import pandas as pd
-
-        try:
-            delimiter = self._detect_delimiter(file_path)
-            df = pd.read_csv(file_path, sep=delimiter, compression="infer", low_memory=False)
-            if len(df.columns) <= 1:
-                alt_delimiter = "\t" if delimiter == "," else ","
-                df = pd.read_csv(file_path, sep=alt_delimiter, compression="infer", low_memory=False)
-
-            if df.empty or len(df.columns) < 2:
-                raise ValueError("processed matrix has no usable columns")
-
-            gene_col = next(
-                (
-                    column
-                    for column in df.columns
-                    if column.lower()
-                    in {
-                        "gene.name",
-                        "genesymbol",
-                        "gene_symbol",
-                        "gene",
-                        "symbol",
-                        "gene symbol",
-                    }
-                ),
-                df.columns[0],
-            )
-
-            sample_cols = []
-            for column in df.columns:
-                if column == gene_col:
-                    continue
-                lower_column = str(column).lower()
-                if any(
-                    token in lower_column
-                    for token in (
-                        "ensembl",
-                        "gene",
-                        "description",
-                        "chromosome",
-                        "scaffold",
-                        "biotype",
-                        "gene.type",
-                        "gene_type",
-                        "transcript",
-                    )
-                ):
-                    continue
-                numeric = pd.to_numeric(df[column], errors="coerce")
-                if len(numeric) and float(numeric.notna().mean()) >= 0.8:
-                    sample_cols.append(column)
-
-            if not sample_cols:
-                raise ValueError("processed matrix has no numeric sample columns")
-
-            expr = df[[gene_col] + sample_cols].copy()
-            expr[gene_col] = expr[gene_col].astype(str).str.strip()
-            expr = expr[expr[gene_col] != ""]
-            expr = expr.dropna(subset=[gene_col])
-            expr[sample_cols] = expr[sample_cols].apply(pd.to_numeric, errors="coerce")
-            expr = expr.groupby(gene_col, as_index=True)[sample_cols].mean()
-            expr = expr.dropna(how="all")
-
-            if target_genes:
-                available_genes = [gene for gene in target_genes if gene in expr.index]
-                if available_genes:
-                    expr = expr.loc[available_genes]
-
-            metadata = self._extract_series_metadata(metadata_file)
-            sample_metadata = self._build_sample_metadata(list(expr.columns), metadata)
-            lower_name = Path(file_path).name.lower()
-            value_scale = (
-                "log"
-                if any(token in lower_name for token in ("log2", "logcpm", "tpmlog2", "logrpkm"))
-                else "linear"
-            )
-            mapping_stats = {
-                "total_probes": len(df),
-                "mapped_probes": len(expr),
-                "unmapped_probes": 0,
-                "unique_genes": len(expr),
-                "platform_id": metadata.get("platform", ""),
-                "mapping_applied": True,
-                "mapping_source": "direct_gene_symbol_column",
-            }
-
-            return APIResponse(
-                success=True,
-                data={
-                    "expression_matrix": expr,
-                    "sample_metadata": sample_metadata,
-                    "platform": metadata.get("platform", ""),
-                    "gene_count": len(expr),
-                    "sample_count": len(expr.columns),
-                    "accession": self._accession_from_file(file_path, metadata_file),
-                    "value_scale": value_scale,
-                    "probe_mapping_stats": mapping_stats,
-                },
-                source=self.source_name,
-                endpoint="parse_series_matrix",
-                params={"file_path": file_path, "metadata_file": metadata_file},
-                timestamp="",
-            )
-        except Exception as exc:
-            return APIResponse(
-                success=False,
-                data=None,
-                source=self.source_name,
-                endpoint="parse_series_matrix",
-                params={"file_path": file_path, "metadata_file": metadata_file},
-                timestamp="",
-                error=f"解析错误: {exc}",
-            )
-
     def parse_series_matrix(
         self,
         file_path: str,
         target_genes: Optional[list[str]] = None,
         probe_id_map: Optional[dict] = None,
-        cache_dir: Optional[str] = None,
-        metadata_file: Optional[str] = None,
+        cache_dir: Optional[str] = None
     ) -> APIResponse:
         """
         解析 GEO Series Matrix 文件
@@ -1519,13 +1056,6 @@ class GEOClient(BaseAPIClient):
             )
 
         try:
-            if not self._looks_like_geo_soft_file(file_path):
-                return self._parse_processed_expression_file(
-                    file_path,
-                    target_genes=target_genes,
-                    metadata_file=metadata_file,
-                )
-
             open_func = gzip.open if file_path.endswith('.gz') else open
             mode = 'rt' if file_path.endswith('.gz') else 'r'
 
@@ -1780,7 +1310,6 @@ class GEOClient(BaseAPIClient):
                     "gene_count": len(df),
                     "sample_count": len(df.columns),
                     "accession": Path(file_path).stem.replace('_series_matrix.txt', ''),
-                    "value_scale": "unknown",
                     "probe_mapping_stats": mapping_stats
                 },
                 source=self.source_name,

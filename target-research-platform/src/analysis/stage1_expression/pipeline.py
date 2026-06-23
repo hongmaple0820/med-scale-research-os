@@ -131,11 +131,6 @@ class Stage1Pipeline:
 
         # 生成摘要
         results["summary"] = self._generate_summary(results)
-        results["success"] = bool(
-            results.get("validation", {})
-            .get("evidence_gate", {})
-            .get("decision_eligible", False)
-        )
 
         # 保存结果
         self._save_results(gene_symbol, results)
@@ -225,12 +220,7 @@ class Stage1Pipeline:
                 }
 
         # 交叉验证
-        if (
-            result["gtex"].get("success")
-            and result["gtex"].get("valid")
-            and (result.get("hpa") or {}).get("success")
-            and (result.get("hpa") or {}).get("valid")
-        ):
+        if result["gtex"]["success"] and (result.get("hpa") or {}).get("success"):
             self.logger.debug("  - 交叉验证GTEx与HPA...")
             validation = self.cross_validator.validate_expression(
                 gene_symbol,
@@ -239,11 +229,7 @@ class Stage1Pipeline:
             )
             result["cross_validation"] = validation.to_dict()
 
-        result["success"] = bool(
-            result["gtex"].get("success")
-            and result["gtex"].get("valid")
-            and (result["gtex"].get("data") or {}).get("tissues")
-        )
+        result["success"] = result["gtex"]["success"]
         return result
 
     def _analyze_tumor_expression(
@@ -442,10 +428,14 @@ class Stage1Pipeline:
         validation["provenance_issues"] = provenance_issues
 
         # 获取整体置信度
+        confidence = self.cross_validator.get_overall_confidence()
+        validation["overall_confidence"] = confidence["overall"]
+
         evidence_gate = evaluate_stage1_evidence(results)
         validation["evidence_gate"] = evidence_gate
-        validation["overall_confidence"] = evidence_gate["confidence"]
-        validation["issues"] = evidence_gate["issues"]
+        validation["decision_eligible"] = evidence_gate["decision_eligible"]
+        if not evidence_gate["decision_eligible"]:
+            validation["issues"].extend(evidence_gate["issues"])
 
         return validation
 
@@ -457,33 +447,17 @@ class Stage1Pipeline:
         summary = {
             "gene": gene,
             "cancer_types": cancer_types,
-            "analysis_status": (
-                results.get("validation", {})
-                .get("evidence_gate", {})
-                .get("status", "blocked")
-            ),
+            "analysis_status": "completed",
             "key_findings": [],
             "data_sources": [],
-            "confidence_level": results.get("validation", {}).get("overall_confidence", "none"),
-            "decision_eligible": (
-                results.get("validation", {})
-                .get("evidence_gate", {})
-                .get("decision_eligible", False)
-            ),
-            "evidence_issues": results.get("validation", {}).get("issues", [])
+            "confidence_level": results.get("validation", {}).get("overall_confidence", "none")
         }
 
         # 收集数据源
         tissue_expr = results["stages"].get("tissue_expression", {})
-        if (
-            (tissue_expr.get("gtex") or {}).get("success")
-            and (tissue_expr.get("gtex") or {}).get("valid")
-        ):
+        if (tissue_expr.get("gtex") or {}).get("success"):
             summary["data_sources"].append("GTEx")
-        if (
-            (tissue_expr.get("hpa") or {}).get("success")
-            and (tissue_expr.get("hpa") or {}).get("valid")
-        ):
+        if (tissue_expr.get("hpa") or {}).get("success"):
             summary["data_sources"].append("HPA")
 
         tumor_expr = results["stages"].get("tumor_expression", {})

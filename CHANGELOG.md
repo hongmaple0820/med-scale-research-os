@@ -1,31 +1,3 @@
-## 0.44.2 - 2026-06-22
-
-### Real Evidence Workflow Reliability
-
-- Fixed HPA protein evidence parsing so Stage 1 uses the current response shape instead of stale nested fields.
-- Hardened TCGA survival retrieval by trying the current `GET /cases` flow first and falling back to the legacy path only when needed.
-- Reworked immune infiltration fallback logic to compute marker-gene estimates from TCGA expression when curated infiltration tables are unavailable.
-- Upgraded GEO dataset discovery and ranking to favor real tumor-vs-normal cohorts and to fall back to processed supplement matrices when `series_matrix` files contain metadata only.
-- Added processed-matrix parsing with metadata alignment and value-scale detection so log-scaled GEO matrices do not produce invalid differential-expression effects.
-- Expanded Stage 2 cross-source validation to preserve deeper ranked candidates and pass real GEO/TCGA overlap checks in the CDK4 / breast cancer workflow.
-- Fixed Stage 3 competitive summaries to use authoritative clinical rollups instead of recomputing active-trial counts from truncated study samples.
-- Added tracked regression coverage in `target-research-platform/tests/test_pipeline_integration.py` for log-scaled DE handling and authoritative Stage 3 competitive summaries.
-
-### Verified
-
-- `python -m pytest target-research-platform/tests/test_pipeline_integration.py -q`
-- `python -m pytest target-research-platform/tests/test_analysis.py -q`
-- `python -m pytest target-research-platform/tests/test_api_clients.py -q`
-- `python main.py stage2 --disease "breast cancer" --exclude-targets CDK4 --output "./output/real_runs/stage2_breast_cancer_20260622_rerun2" --cache "./cache" --json`
-- `python main.py full --target CDK4 --disease "breast cancer" --cancers BRCA LUAD --output "./output/real_runs/cdk4_breast_cancer_20260622_full" --cache "./cache" --json`
-- `python main.py stage3 --target CDK4 --disease "breast cancer" --output "./output/real_runs/cdk4_breast_cancer_20260622_stage3_rerun" --cache "./cache" --json`
-- `npm run lint`
-- `npm run typecheck`
-- `npm run test`
-- `npm run build`
-- `npm run smoke:medscale-release`
-- `npm pack --dry-run`
-
 ## 0.43.0 - 2026-05-27
 
 ### Governance Hardening & Migration Readiness

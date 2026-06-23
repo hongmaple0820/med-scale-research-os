@@ -10,8 +10,11 @@ from typing import Optional
 from ...api_clients.clinicaltrials_client import ClinicalTrialsClient
 from ...api_clients.pubmed_client import PubMedClient
 from ...api_clients.opentargets_client import OpenTargetsClient
+from ...api_clients.openfda_client import OpenFDAClient
+from ...api_clients.patentsview_client import PatentsViewClient
 from ...utils.logger import get_logger
 from ...validators.data_provenance import ProvenanceTracker
+from ...validators.evidence_gate import evaluate_stage3_evidence
 from .target_function import TargetFunctionAnalyzer
 from .competitive_landscape import CompetitiveAnalyzer
 
@@ -32,6 +35,8 @@ class Stage3Pipeline:
         self.clinical_client = ClinicalTrialsClient(cache_dir=cache_dir)
         self.pubmed_client = PubMedClient(cache_dir=cache_dir)
         self.opentargets_client = OpenTargetsClient(cache_dir=cache_dir)
+        self.openfda_client = OpenFDAClient(cache_dir=cache_dir)
+        self.patents_client = PatentsViewClient(cache_dir=cache_dir)
 
         # 初始化分析器
         self.function_analyzer = TargetFunctionAnalyzer()
@@ -99,8 +104,13 @@ class Stage3Pipeline:
 
         # 4. 竞争格局分析
         self.logger.info("[4/5] 竞争格局分析...")
+        patent_result = self._analyze_patents(target_name, disease)
+        results["stages"]["patents"] = patent_result
+        market_result = self._analyze_market_evidence(target_name, disease)
+        results["stages"]["market_evidence"] = market_result
+
         competitive_result = self._analyze_competitive_landscape(
-            target_name, disease, clinical_result
+            target_name, disease, clinical_result, patent_result, market_result
         )
         results["stages"]["competitive_landscape"] = competitive_result
 
@@ -117,9 +127,6 @@ class Stage3Pipeline:
 
         # 生成摘要
         results["summary"] = self._generate_summary(results)
-        results["success"] = all(
-            validation_result.get("data_completeness", {}).values()
-        )
 
         # 保存结果
         self._save_results(target_name, disease, results)
@@ -267,11 +274,73 @@ class Stage3Pipeline:
                 "error": pubmed_response.error
             }
 
+    def _analyze_patents(
+        self,
+        target_name: str,
+        disease: Optional[str]
+    ) -> dict:
+        """Fetch traceable patent evidence."""
+        self.logger.debug("  - Query USPTO PatentsView/ODP...")
+        patent_response = self.patents_client.search_patents(
+            target_name,
+            disease,
+            max_results=25
+        )
+
+        if patent_response.success:
+            self.provenance_tracker.track_from_api_response(
+                "patents.uspto",
+                patent_response.data,
+                patent_response
+            )
+            return {
+                "success": True,
+                "data": patent_response.data
+            }
+
+        return {
+            "success": False,
+            "error": patent_response.error,
+            "data": patent_response.data
+        }
+
+    def _analyze_market_evidence(
+        self,
+        target_name: str,
+        disease: Optional[str]
+    ) -> dict:
+        """Fetch public regulatory evidence for market/competitive context."""
+        self.logger.debug("  - Query openFDA drug labels...")
+        market_response = self.openfda_client.search_market_evidence(
+            target_name,
+            disease,
+            max_results=10
+        )
+
+        if market_response.success:
+            self.provenance_tracker.track_from_api_response(
+                "market.openfda",
+                market_response.data,
+                market_response
+            )
+            return {
+                "success": True,
+                "data": market_response.data
+            }
+
+        return {
+            "success": False,
+            "error": market_response.error,
+            "data": market_response.data
+        }
+
     def _analyze_competitive_landscape(
         self,
         target_name: str,
         disease: Optional[str],
-        clinical_result: dict
+        clinical_result: dict,
+        patent_result: Optional[dict] = None,
+        market_result: Optional[dict] = None
     ) -> dict:
         """分析竞争格局"""
         self.logger.debug("  - 整合竞争数据...")
@@ -288,7 +357,9 @@ class Stage3Pipeline:
         competitive_result = self.competitive_analyzer.analyze(
             target_name=target_name,
             disease=disease,
-            clinical_data=clinical_data
+            clinical_data=clinical_data,
+            patent_data=(patent_result or {}).get("data") if (patent_result or {}).get("success") else None,
+            market_data=(market_result or {}).get("data") if (market_result or {}).get("success") else None
         )
 
         return {
@@ -570,8 +641,16 @@ class Stage3Pipeline:
             "target_function": stages.get("target_function", {}).get("success", False),
             "clinical_pipeline": stages.get("clinical_pipeline", {}).get("success", False),
             "literature": stages.get("literature", {}).get("success", False),
+            "patents": stages.get("patents", {}).get("success", False),
+            "market_evidence": stages.get("market_evidence", {}).get("success", False),
             "competitive_landscape": stages.get("competitive_landscape", {}).get("success", False)
         }
+
+        evidence_gate = evaluate_stage3_evidence(results)
+        validation["evidence_gate"] = evidence_gate
+        validation["decision_eligible"] = evidence_gate["decision_eligible"]
+        if not evidence_gate["decision_eligible"]:
+            validation["issues"].extend(evidence_gate["issues"])
 
         return validation
 

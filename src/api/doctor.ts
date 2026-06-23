@@ -21,6 +21,7 @@ export interface DiagnosticResult {
   message: string
   fix?: string
   category?: 'governance' | 'knowledge-graph' | 'runtime' | 'memory'
+  optional?: boolean
 }
 
 export interface DoctorReport {
@@ -86,14 +87,18 @@ export class Doctor {
       ? this.skippedEngineeringStandardsForWorkspaceConflict()
       : this.checkEngineeringStandards()
     const governanceDriftCheck = this.checkGovernanceDrift()
-    // All governance checks are mandatory
-    governanceTemplatesCheck.category = 'governance'
-    verificationMatrixCheck.category = 'governance'
-    skillRoutingPolicyCheck.category = 'governance'
-    toolPolicyCheck.category = 'governance'
-    resourcePolicyCheck.category = 'governance'
-    engineeringStandardsCheck.category = 'governance'
-    governanceDriftCheck.category = 'governance'
+    for (const check of [
+      governanceTemplatesCheck,
+      verificationMatrixCheck,
+      skillRoutingPolicyCheck,
+      toolPolicyCheck,
+      resourcePolicyCheck,
+      engineeringStandardsCheck,
+      governanceDriftCheck,
+    ]) {
+      check.category = 'governance'
+      check.optional = true
+    }
     checks.push(governanceTemplatesCheck)
     checks.push(verificationMatrixCheck)
     checks.push(skillRoutingPolicyCheck)
@@ -104,10 +109,12 @@ export class Doctor {
 
     const runtimeEvidenceCheck = this.checkRuntimeEvidence()
     runtimeEvidenceCheck.category = 'runtime'
+    runtimeEvidenceCheck.optional = true
     checks.push(runtimeEvidenceCheck)
 
     const configHealthCheck = this.checkConfigHealth()
     configHealthCheck.category = 'governance'
+    configHealthCheck.optional = true
     checks.push(configHealthCheck)
 
     // Optional knowledge graph checks (non-blocking)
@@ -123,6 +130,12 @@ export class Doctor {
     codegraphCheck.category = 'knowledge-graph'
     codegraphProjectCheck.category = 'knowledge-graph'
     memoryRoutingCheck.category = 'memory'
+    pythonCheck.optional = true
+    graphifyCheck.optional = true
+    graphifyArtifactCheck.optional = true
+    codegraphCheck.optional = true
+    codegraphProjectCheck.optional = true
+    memoryRoutingCheck.optional = true
     checks.push(pythonCheck)
     checks.push(graphifyCheck)
     checks.push(graphifyArtifactCheck)
@@ -130,8 +143,7 @@ export class Doctor {
     checks.push(codegraphProjectCheck)
     checks.push(memoryRoutingCheck)
 
-    // Calculate overall health including all checks
-    const coreChecks = checks
+    const coreChecks = checks.filter((c) => !c.optional)
     const fails = coreChecks.filter((c) => c.status === 'fail').length
     const warns = coreChecks.filter((c) => c.status === 'warn').length
     const overall = fails > 0 ? 'broken' : warns > 0 ? 'degraded' : 'healthy'
@@ -1008,8 +1020,10 @@ export class Doctor {
     const appendSection = (title: string, category: NonNullable<DiagnosticResult['category']>) => {
       const sectionChecks = report.checks.filter((c) => c.category === category)
       if (sectionChecks.length === 0) return
+      const baseTitle = title.replace(/:$/, '')
+      const optionalSuffix = sectionChecks.every((c) => c.optional) ? ' (Optional)' : ''
       lines.push('')
-      lines.push(title)
+      lines.push(`${baseTitle}${optionalSuffix}:`)
       for (const check of sectionChecks) {
         lines.push(`  ${statusIcon[check.status]} ${check.name}: ${check.message}`)
         if (check.fix) lines.push(`     Fix: ${check.fix}`)

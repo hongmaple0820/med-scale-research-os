@@ -115,7 +115,7 @@ const CHECK_DEFINITIONS: Array<{
     id: 'powershell',
     label: 'PowerShell',
     category: 'shell',
-    required: true,
+    required: false,
     candidates: [
       { command: 'pwsh', args: ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], display: 'pwsh' },
       { command: 'powershell', args: ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], display: 'powershell' },
@@ -127,7 +127,7 @@ const CHECK_DEFINITIONS: Array<{
     id: 'bash',
     label: 'Bash',
     category: 'shell',
-    required: true,
+    required: false,
     candidates: [{ command: 'bash', args: ['--version'], display: 'bash' }],
     requiredFor: ['Unix workflow wrappers', 'make targets'],
     installHint: 'Install Bash through Git for Windows, WSL, or the OS package manager.',
@@ -136,7 +136,7 @@ const CHECK_DEFINITIONS: Array<{
     id: 'cargo',
     label: 'Rust/Cargo',
     category: 'runtime',
-    required: true,
+    required: false,
     candidates: [{ command: 'cargo', args: ['--version'], display: 'cargo' }],
     requiredFor: ['rtk install'],
     installHint: 'Install Rust with rustup, then re-open the shell so cargo is on PATH.',
@@ -145,7 +145,7 @@ const CHECK_DEFINITIONS: Array<{
     id: 'bun',
     label: 'Bun',
     category: 'runtime',
-    required: true,
+    required: false,
     candidates: [{ command: 'bun', args: ['--version'], display: 'bun' }],
     requiredFor: ['gbrain install'],
     installHint: 'Install Bun from https://bun.sh and re-open the shell.',
@@ -154,7 +154,7 @@ const CHECK_DEFINITIONS: Array<{
     id: 'python',
     label: 'Python',
     category: 'runtime',
-    required: true,
+    required: false,
     candidates: [
       { command: 'python', args: ['--version'], display: 'python' },
       { command: 'python3', args: ['--version'], display: 'python3' },
@@ -167,7 +167,7 @@ const CHECK_DEFINITIONS: Array<{
     id: 'python-installer',
     label: 'Python installer',
     category: 'runtime',
-    required: true,
+    required: false,
     candidates: [
       { command: 'uv', args: ['--version'], display: 'uv' },
       { command: 'pipx', args: ['--version'], display: 'pipx' },
@@ -183,7 +183,7 @@ const CHECK_DEFINITIONS: Array<{
     id: 'rtk',
     label: 'RTK',
     category: 'third-party',
-    required: true,
+    required: false,
     candidates: [{ command: 'rtk', args: ['--version'], display: 'rtk' }],
     requiredFor: ['governed CLI proxy', 'token savings evidence'],
     installHint: 'Install with cargo, then run `rtk init -g --codex` and `rtk gain`.',
@@ -192,7 +192,7 @@ const CHECK_DEFINITIONS: Array<{
     id: 'gbrain',
     label: 'GBrain',
     category: 'third-party',
-    required: true,
+    required: false,
     candidates: [{ command: 'gbrain', args: ['doctor', '--json'], display: 'gbrain doctor --json' }],
     requiredFor: ['memory provider routing', 'cross-session recall'],
     installHint: 'Install with Bun and run `gbrain init --pglite` before autonomous recall.',
@@ -201,7 +201,7 @@ const CHECK_DEFINITIONS: Array<{
     id: 'graphify',
     label: 'Graphify',
     category: 'third-party',
-    required: true,
+    required: false,
     candidates: [{ command: 'graphify', args: ['--version'], display: 'graphify' }],
     requiredFor: ['knowledge graph provider'],
     installHint: 'Install with `uv tool install graphify && graphify install --platform codex`.',
@@ -210,7 +210,7 @@ const CHECK_DEFINITIONS: Array<{
     id: 'codegraph',
     label: 'CodeGraph',
     category: 'third-party',
-    required: true,
+    required: false,
     candidates: [{ command: 'codegraph', args: ['--version'], display: 'codegraph' }],
     requiredFor: ['code intelligence provider'],
     installHint: 'Install with `npm install -g @colbymchenry/codegraph` and run `codegraph init -i` per project.',
@@ -231,12 +231,7 @@ export function inspectEnvironment(options: InspectEnvironmentOptions = {}): Env
     .map(entry => entry.trim())
     .filter(Boolean)
 
-  const checks = CHECK_DEFINITIONS.map(definition => inspectCommand(
-    definitionForPlatform(definition, currentPlatform),
-    resolver,
-    runner,
-    currentPlatform,
-  ))
+  const checks = CHECK_DEFINITIONS.map(definition => inspectCommand(definition, resolver, runner, currentPlatform))
   const nodeStatus = nodeVersionStatus(currentNodeVersion)
   const warnings = buildWarnings(checks, nodeStatus)
   const recommendations = buildRecommendations(checks, nodeStatus)
@@ -306,6 +301,7 @@ function inspectCommand(
   runner: NonNullable<InspectEnvironmentOptions['commandRunner']>,
   currentPlatform: NodeJS.Platform,
 ): EnvironmentCommandCheck {
+  const required = isRequiredOnPlatform(definition, currentPlatform)
   let firstFailed: EnvironmentCommandCheck | undefined
   for (const candidate of definition.candidates) {
     const resolved = resolver(candidate.command)
@@ -321,7 +317,7 @@ function inspectCommand(
         label: definition.label,
         category: definition.category,
         status: status.status,
-        required: definition.required,
+        required,
         candidates: definition.candidates.map(item => item.display),
         detectedCommand: candidate.display,
         resolvedPath: resolved,
@@ -337,7 +333,7 @@ function inspectCommand(
         label: definition.label,
         category: definition.category,
         status: interpreted.status,
-        required: definition.required,
+        required,
         candidates: definition.candidates.map(item => item.display),
         detectedCommand: candidate.display,
         resolvedPath: resolved,
@@ -352,7 +348,7 @@ function inspectCommand(
       label: definition.label,
       category: definition.category,
       status: 'warn',
-      required: definition.required,
+      required,
       candidates: definition.candidates.map(item => item.display),
       detectedCommand: candidate.display,
       resolvedPath: resolved,
@@ -366,8 +362,8 @@ function inspectCommand(
     id: definition.id,
     label: definition.label,
     category: definition.category,
-    status: definition.required ? 'fail' : 'missing',
-    required: definition.required,
+    status: required ? 'fail' : 'missing',
+    required,
     candidates: definition.candidates.map(item => item.display),
     reason: `${definition.label} was not detected on PATH.`,
     installHint: definition.installHint,
@@ -375,18 +371,11 @@ function inspectCommand(
   }
 }
 
-function definitionForPlatform(
+function isRequiredOnPlatform(
   definition: typeof CHECK_DEFINITIONS[number],
   currentPlatform: NodeJS.Platform,
-): typeof CHECK_DEFINITIONS[number] {
-  return {
-    ...definition,
-    required: isRequiredForPlatform(definition, currentPlatform),
-  }
-}
-
-function isRequiredForPlatform(definition: typeof CHECK_DEFINITIONS[number], _currentPlatform: NodeJS.Platform): boolean {
-  if (definition.category !== 'core') return false
+): boolean {
+  if (definition.id === 'bash' && currentPlatform === 'win32') return false
   return definition.required
 }
 

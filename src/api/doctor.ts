@@ -20,8 +20,8 @@ export interface DiagnosticResult {
   status: 'ok' | 'warn' | 'fail'
   message: string
   fix?: string
-  optional?: boolean
   category?: 'governance' | 'knowledge-graph' | 'runtime' | 'memory'
+  optional?: boolean
 }
 
 export interface DoctorReport {
@@ -124,11 +124,17 @@ export class Doctor {
     const codegraphCheck = this.checkCodegraph(toolCapabilities, bootstrapPlan)
     const codegraphProjectCheck = this.checkCodegraphProject(codeIntelligence)
     const memoryRoutingCheck = this.checkMemoryProviders(memoryProviders, bootstrapPlan)
-    for (const check of [pythonCheck, graphifyCheck, graphifyArtifactCheck, codegraphCheck, codegraphProjectCheck]) {
-      check.category = 'knowledge-graph'
-      check.optional = true
-    }
+    pythonCheck.category = 'knowledge-graph'
+    graphifyCheck.category = 'knowledge-graph'
+    graphifyArtifactCheck.category = 'knowledge-graph'
+    codegraphCheck.category = 'knowledge-graph'
+    codegraphProjectCheck.category = 'knowledge-graph'
     memoryRoutingCheck.category = 'memory'
+    pythonCheck.optional = true
+    graphifyCheck.optional = true
+    graphifyArtifactCheck.optional = true
+    codegraphCheck.optional = true
+    codegraphProjectCheck.optional = true
     memoryRoutingCheck.optional = true
     checks.push(pythonCheck)
     checks.push(graphifyCheck)
@@ -137,7 +143,7 @@ export class Doctor {
     checks.push(codegraphProjectCheck)
     checks.push(memoryRoutingCheck)
 
-    const coreChecks = checks.filter((check) => !check.optional)
+    const coreChecks = checks.filter((c) => !c.optional)
     const fails = coreChecks.filter((c) => c.status === 'fail').length
     const warns = coreChecks.filter((c) => c.status === 'warn').length
     const overall = fails > 0 ? 'broken' : warns > 0 ? 'degraded' : 'healthy'
@@ -842,7 +848,7 @@ export class Doctor {
       const recSuffix = recommendations.length > 0 ? ` — ${recommendations.join('; ')}` : ''
       return {
         name: 'Config health',
-        status: 'ok',
+        status: recommendations.length > 0 ? 'warn' : 'ok',
         message: `${summary}${recSuffix}`,
       }
     } catch {
@@ -1014,18 +1020,20 @@ export class Doctor {
     const appendSection = (title: string, category: NonNullable<DiagnosticResult['category']>) => {
       const sectionChecks = report.checks.filter((c) => c.category === category)
       if (sectionChecks.length === 0) return
+      const baseTitle = title.replace(/:$/, '')
+      const optionalSuffix = sectionChecks.every((c) => c.optional) ? ' (Optional)' : ''
       lines.push('')
-      lines.push(title)
+      lines.push(`${baseTitle}${optionalSuffix}:`)
       for (const check of sectionChecks) {
         lines.push(`  ${statusIcon[check.status]} ${check.name}: ${check.message}`)
         if (check.fix) lines.push(`     Fix: ${check.fix}`)
       }
     }
 
-    appendSection('Project Governance (Optional):', 'governance')
-    appendSection('Knowledge Graph (Optional):', 'knowledge-graph')
-    appendSection('Memory Providers (Optional):', 'memory')
-    appendSection('Runtime Evidence (Optional):', 'runtime')
+    appendSection('Project Governance:', 'governance')
+    appendSection('Knowledge Graph:', 'knowledge-graph')
+    appendSection('Memory Providers:', 'memory')
+    appendSection('Runtime Evidence:', 'runtime')
 
     if (report.knowledgeGraph) {
       const knowledgeGraph = report.knowledgeGraph

@@ -3,12 +3,15 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
+  attestTargetNoModelUsage,
+  buildTargetReleaseReadiness,
   buildTargetRuntimeReadiness,
   buildTargetSetupPlan,
   buildTargetTokenCostReport,
   applyTargetSetup,
   formatStageLabel,
   ingestTargetTokenUsage,
+  readTargetNoModelUsageAttestation,
   renderTargetSetupVisualPlan,
   resolveTargetMemorySeedPlan,
   resolveTargetPlatform,
@@ -81,10 +84,15 @@ describe('targetCommands', () => {
   it('exposes token/cost reporting as a first-class target command', () => {
     expect(Object.keys(targetCommand.subCommands ?? {})).toContain('token')
     expect(Object.keys(targetCommand.subCommands?.token.subCommands ?? {})).toContain('ingest')
+    expect(Object.keys(targetCommand.subCommands?.token.subCommands ?? {})).toContain('attest-no-usage')
   })
 
   it('exposes medical runtime doctor as a first-class target command', () => {
     expect(Object.keys(targetCommand.subCommands ?? {})).toContain('doctor')
+  })
+
+  it('exposes release readiness as a first-class target command', () => {
+    expect(Object.keys(targetCommand.subCommands ?? {})).toContain('release-check')
   })
 
   it('exposes MedSCALE OS plan export as a first-class target command', () => {
@@ -140,6 +148,8 @@ describe('targetCommands', () => {
       writeFileSync(join(platformDir, 'src', 'dashboard', 'app.py'), '', 'utf-8')
       writeFileSync(join(platformDir, 'src', 'api_clients', 'pubmed_client.py'), 'class PubMedClient: pass\n', 'utf-8')
       writeFileSync(join(platformDir, 'src', 'api_clients', 'openalex_client.py'), 'class OpenAlexClient: pass\n', 'utf-8')
+      writeFileSync(join(platformDir, 'src', 'api_clients', 'openfda_client.py'), 'class OpenFDAClient: pass\n', 'utf-8')
+      writeFileSync(join(platformDir, 'src', 'api_clients', 'patentsview_client.py'), 'class PatentsViewClient: pass\n', 'utf-8')
       writeFileSync(join(platformDir, 'src', 'output', 'delivery_packager.py'), 'def audit_delivery_package():\n    return {"hash_mismatches": [], "broken_markdown_refs": [], "broken_image_refs": [], "image_refs_checked": 1}\n', 'utf-8')
       writeFileSync(join(platformDir, 'src', 'output', 'manuscript_quality.py'), 'CHECK_ID = "figures.referenced_in_text"\n', 'utf-8')
       writeFileSync(join(platformDir, 'tests', 'test_literature_enrichment.py'), 'def test_literature():\n    assert True\n', 'utf-8')
@@ -161,8 +171,60 @@ describe('targetCommands', () => {
       expect(cards.mcp_surface.state).toBe('warning')
       expect(cards.token_cost.state).toBe('warning')
       expect(cards.token_cost.statusLabel).toBe('COST PENDING')
+      expect(cards.medical_retrieval.state).toBe('warning')
+      expect(cards.medical_retrieval.statusLabel).toBe('PATENT KEY MISSING')
+      expect(cards.medical_retrieval.details).toContain('patent_api_key=missing')
       expect(cards.medical_workflow.state).toBe('pass')
       expect(readiness.requiredMissing).toEqual([])
+
+      const release = buildTargetReleaseReadiness({
+        projectDir,
+        env: {
+          ...process.env,
+          PATH: fakeBin,
+          Path: fakeBin,
+          PATHEXT: '.CMD;.EXE;.PS1',
+        },
+        checkGit: false,
+      })
+      expect(release.ok).toBe(false)
+      expect(release.status).toBe('blocked')
+      expect(release.blockers).toEqual(expect.arrayContaining([
+        expect.stringContaining('token_usage_ledger'),
+      ]))
+      expect(release.blockers).not.toEqual(expect.arrayContaining([
+        expect.stringContaining('patent_evidence_credentials'),
+      ]))
+      expect(release.warnings).toEqual(expect.arrayContaining([
+        expect.stringContaining('runtime_readiness'),
+        expect.stringContaining('patent_evidence_credentials'),
+      ]))
+
+      const attestation = attestTargetNoModelUsage({
+        projectDir,
+        releaseScope: 'test-release',
+        reason: 'Focused release readiness tests did not call a model provider.',
+        assertedBy: 'vitest',
+        evidence: ['npx vitest run tests/cli/targetCommands.test.ts'],
+      })
+      expect(readTargetNoModelUsageAttestation(projectDir)).toEqual(attestation)
+
+      const releaseWithAttestation = buildTargetReleaseReadiness({
+        projectDir,
+        env: {
+          ...process.env,
+          PATH: fakeBin,
+          Path: fakeBin,
+          PATHEXT: '.CMD;.EXE;.PS1',
+        },
+        checkGit: false,
+      })
+      expect(releaseWithAttestation.ok).toBe(true)
+      expect(releaseWithAttestation.checks.find(check => check.id === 'token_usage_ledger')).toEqual(expect.objectContaining({
+        state: 'pass',
+        statusLabel: 'NO MODEL USAGE ATTESTED',
+      }))
+      expect(buildTargetTokenCostReport({ projectDir, sinceDays: undefined }).summary.totalRecords).toBe(0)
     } finally {
       rmSync(projectDir, { recursive: true, force: true })
     }
@@ -229,6 +291,8 @@ describe('targetCommands', () => {
       writeFileSync(join(platformDir, 'src', 'dashboard', 'app.py'), '', 'utf-8')
       writeFileSync(join(platformDir, 'src', 'api_clients', 'pubmed_client.py'), 'class PubMedClient: pass\n', 'utf-8')
       writeFileSync(join(platformDir, 'src', 'api_clients', 'openalex_client.py'), 'class OpenAlexClient: pass\n', 'utf-8')
+      writeFileSync(join(platformDir, 'src', 'api_clients', 'openfda_client.py'), 'class OpenFDAClient: pass\n', 'utf-8')
+      writeFileSync(join(platformDir, 'src', 'api_clients', 'patentsview_client.py'), 'class PatentsViewClient: pass\n', 'utf-8')
       writeFileSync(join(platformDir, 'src', 'output', 'delivery_packager.py'), 'def audit_delivery_package():\n    return {"hash_mismatches": [], "broken_markdown_refs": [], "broken_image_refs": [], "image_refs_checked": 1}\n', 'utf-8')
       writeFileSync(join(platformDir, 'src', 'output', 'manuscript_quality.py'), 'CHECK_ID = "figures.referenced_in_text"\n', 'utf-8')
       writeFileSync(join(platformDir, 'tests', 'test_literature_enrichment.py'), 'def test_literature():\n    assert True\n', 'utf-8')
@@ -239,6 +303,7 @@ describe('targetCommands', () => {
         PATH: fakeBin,
         Path: fakeBin,
         PATHEXT: '.CMD;.EXE;.PS1',
+        PATENTSVIEW_API_KEY: 'test-key',
       })
       const cards = Object.fromEntries(readiness.cards.map(card => [card.id, card]))
 
@@ -248,8 +313,31 @@ describe('targetCommands', () => {
       expect(cards.mcp_surface.state).toBe('pass')
       expect(cards.mcp_surface.statusLabel).toBe('MCP READY')
       expect(cards.mcp_surface.details).toContain('missing_medical_routes=none')
+      expect(cards.medical_retrieval.state).toBe('pass')
+      expect(cards.medical_retrieval.statusLabel).toBe('RETRIEVAL READY')
+      expect(cards.medical_retrieval.details).toContain('patent_api_key=present')
       expect(cards.token_cost.state).toBe('pass')
       expect(cards.token_cost.statusLabel).toBe('COST TRACKED')
+
+      const release = buildTargetReleaseReadiness({
+        projectDir,
+        env: {
+          ...process.env,
+          PATH: fakeBin,
+          Path: fakeBin,
+          PATHEXT: '.CMD;.EXE;.PS1',
+          PATENTSVIEW_API_KEY: 'test-key',
+        },
+        checkGit: false,
+      })
+      expect(release.ok).toBe(true)
+      expect(release.status).toBe('ready')
+      expect(release.checks.map(check => [check.id, check.state])).toEqual([
+        ['runtime_readiness', 'pass'],
+        ['token_usage_ledger', 'pass'],
+        ['patent_evidence_credentials', 'pass'],
+        ['git_worktree_clean', 'warning'],
+      ])
     } finally {
       rmSync(projectDir, { recursive: true, force: true })
     }
@@ -343,7 +431,7 @@ describe('targetCommands', () => {
       expect(capabilities.rtk.required).toBe(false)
       expect(capabilities['medical-skills'].status).toBe('partial')
       expect(capabilities['mcp-server-map'].status).toBe('partial')
-      expect(capabilities['pubmed-openalex'].status).toBe('ready')
+      expect(capabilities['pubmed-openalex'].status).toBe('partial')
       expect(capabilities['package-audit'].status).toBe('ready')
       expect(capabilities['figure-refs'].status).toBe('ready')
       expect(capabilities['memory-brain-review'].status).toBe('ready')

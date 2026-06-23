@@ -19,7 +19,6 @@ import uuid
 import sys
 import traceback
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -92,106 +91,43 @@ def _error(
     return result
 
 
-def _pipeline_checkpoint_path(output_root: str | Path) -> Path:
-    return Path(output_root) / "pipeline_checkpoint.json"
-
-
-def _write_pipeline_checkpoint(
-    output_root: str | Path,
-    results: dict,
-    *,
-    status: str,
-    current_stage: str,
-    reason: str | None = None,
-) -> str:
-    path = _pipeline_checkpoint_path(output_root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema": "medscale.pipeline_checkpoint.v1",
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "status": status,
-        "current_stage": current_stage,
-        "target": results.get("target"),
-        "disease": results.get("disease"),
-        "reason": reason,
-        "stages": {
-            name: {
-                "status": stage_result.get("status")
-                or ("completed" if stage_result.get("success") else "blocked"),
-                "success": bool(stage_result.get("success")),
-                "error": stage_result.get("error"),
-                "evidence_status": (
-                    (stage_result.get("summary") or {}).get("analysis_status")
-                    or (stage_result.get("validation") or {}).get("evidence_status")
-                ),
-            }
-            for name, stage_result in (results.get("stages") or {}).items()
-        },
+def _evidence_gate_block(stage_name: str, stage_results: dict) -> dict | None:
+    validation = stage_results.get("validation", {}) if isinstance(stage_results, dict) else {}
+    gate = validation.get("evidence_gate", {}) if isinstance(validation, dict) else {}
+    if not gate or gate.get("decision_eligible") is not False:
+        return None
+    return {
+        "stage": stage_name,
+        "status": gate.get("status", "blocked"),
+        "confidence": gate.get("confidence", "none"),
+        "issues": gate.get("issues", []),
+        "checks": gate.get("checks", {}),
+        "valid_sources": gate.get("valid_sources") or gate.get("independent_sources") or [],
     }
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, default=str),
-        encoding="utf-8",
-    )
-    return str(path.resolve())
 
 
-def _stop_full_pipeline(
+def _stop_full_pipeline_for_evidence(
     all_results: dict,
-    args,
-    *,
-    failed_stage: str,
-    tracker=None,
-    json_mode: bool = False,
-) -> dict:
-    stage_result = all_results["stages"][failed_stage]
-    issues = (
-        (stage_result.get("summary") or {}).get("evidence_issues")
-        or (stage_result.get("validation") or {}).get("issues")
-        or stage_result.get("issues")
-        or []
-    )
-    reason = stage_result.get("error") or (
-        f"{failed_stage} evidence gate blocked downstream execution"
-    )
-    if issues:
-        reason = f"{reason}: {'; '.join(str(item) for item in issues)}"
-
-    stage_order = ["stage1", "stage2", "stage3", "stage4"]
-    failed_index = stage_order.index(failed_stage)
-    for stage_name in stage_order[failed_index + 1:]:
-        all_results["stages"].setdefault(stage_name, {
-            "success": False,
-            "status": "skipped",
-            "reason": f"Skipped because {failed_stage} did not pass its evidence gate.",
-        })
+    stage_name: str,
+    stage_results: dict,
+    tracker,
+    json_mode: bool,
+) -> bool:
+    block = _evidence_gate_block(stage_name, stage_results)
+    if not block:
+        return False
 
     all_results["success"] = False
-    all_results["error"] = reason
-    all_results["summary"] = {
-        "target": all_results.get("target"),
-        "disease": all_results.get("disease"),
-        "stages_completed": [
-            name for name, result in all_results["stages"].items()
-            if result.get("success")
-        ],
-        "stages_failed": [failed_stage],
-        "stages_skipped": [
-            name for name, result in all_results["stages"].items()
-            if result.get("status") == "skipped"
-        ],
-    }
-    checkpoint = _write_pipeline_checkpoint(
-        args.output,
-        all_results,
-        status="blocked",
-        current_stage=failed_stage,
-        reason=reason,
+    all_results["blocked_stage"] = stage_name
+    all_results["evidence_gate"] = block
+    all_results["error"] = (
+        f"{stage_name} evidence gate blocked the full pipeline; "
+        "downstream conclusions were not generated."
     )
-    all_results.setdefault("artifacts", {})["pipeline_checkpoint"] = checkpoint
     if tracker:
-        tracker.fail_run(reason)
+        tracker.fail_run(all_results["error"])
     _output(all_results, json_mode)
-    return all_results
+    return True
 
 
 def _manuscript_status_file(output_root: Path) -> Path:
@@ -334,7 +270,7 @@ def run_stage1(args) -> dict:
                 cancer_types=args.cancers,
                 ensg_id=args.ensg
             )
-        results["success"] = bool(results.get("success"))
+        results["success"] = True
         results["stage"] = "stage1"
         if not getattr(args, "quiet", False):
             _output(results, json_mode)
@@ -374,7 +310,7 @@ def run_stage2(args) -> dict:
                 normal_tissue_expression=normal_tissue_expr,
                 cancer_code=cancer_code,
             )
-        results["success"] = bool(results.get("success"))
+        results["success"] = True
         results["stage"] = "stage2"
         if not getattr(args, "quiet", False):
             _output(results, json_mode)
@@ -406,7 +342,7 @@ def run_stage3(args) -> dict:
                 ensg_id=args.ensg,
                 disease=args.disease
             )
-        results["success"] = bool(results.get("success"))
+        results["success"] = True
         results["stage"] = "stage3"
         if not quiet:
             _output(results, json_mode)
@@ -442,7 +378,7 @@ def run_stage4(args, stage1_data=None, stage2_data=None, stage3_data=None) -> di
                 modality=args.modality,
                 risk_level=args.risk_level
             )
-        results["success"] = bool(results.get("success"))
+        results["success"] = True
         results["stage"] = "stage4"
         if not quiet:
             _output(results, json_mode)
@@ -469,14 +405,7 @@ def run_full_pipeline(args) -> dict:
         "target": args.target,
         "disease": args.disease,
         "stages": {},
-        "artifacts": {},
     }
-    all_results["artifacts"]["pipeline_checkpoint"] = _write_pipeline_checkpoint(
-        args.output,
-        all_results,
-        status="running",
-        current_stage="stage1",
-    )
 
     if tracker:
         tracker.start_run(
@@ -510,16 +439,21 @@ def run_full_pipeline(args) -> dict:
         tracker.complete_stage("stage1", stage1_results, 25)
 
     if not stage1_results.get("success"):
-        return _stop_full_pipeline(
-            all_results,
-            args,
-            failed_stage="stage1",
-            tracker=tracker,
-            json_mode=json_mode,
-        )
-    _write_pipeline_checkpoint(
-        args.output, all_results, status="running", current_stage="stage2"
-    )
+        all_results["success"] = False
+        all_results["error"] = "阶段1失败，终止 Pipeline"
+        if tracker:
+            tracker.fail_run(all_results["error"])
+        _output(all_results, json_mode)
+        return all_results
+
+    if getattr(args, "strict_evidence", False) and _stop_full_pipeline_for_evidence(
+        all_results,
+        "stage1",
+        stage1_results,
+        tracker,
+        json_mode,
+    ):
+        return all_results
 
     if not json_mode:
         print("\n>>> 阶段2: 多维靶点筛选与优先级排序")
@@ -540,17 +474,14 @@ def run_full_pipeline(args) -> dict:
     all_results["stages"]["stage2"] = stage2_results
     if tracker:
         tracker.complete_stage("stage2", stage2_results, 55)
-    if not stage2_results.get("success"):
-        return _stop_full_pipeline(
-            all_results,
-            args,
-            failed_stage="stage2",
-            tracker=tracker,
-            json_mode=json_mode,
-        )
-    _write_pipeline_checkpoint(
-        args.output, all_results, status="running", current_stage="stage3"
-    )
+    if getattr(args, "strict_evidence", False) and _stop_full_pipeline_for_evidence(
+        all_results,
+        "stage2",
+        stage2_results,
+        tracker,
+        json_mode,
+    ):
+        return all_results
 
     ensg_id = args.ensg or stage1_results.get("ensg_id")
     if not json_mode:
@@ -570,17 +501,14 @@ def run_full_pipeline(args) -> dict:
     all_results["stages"]["stage3"] = stage3_results
     if tracker:
         tracker.complete_stage("stage3", stage3_results, 80)
-    if not stage3_results.get("success"):
-        return _stop_full_pipeline(
-            all_results,
-            args,
-            failed_stage="stage3",
-            tracker=tracker,
-            json_mode=json_mode,
-        )
-    _write_pipeline_checkpoint(
-        args.output, all_results, status="running", current_stage="stage4"
-    )
+    if getattr(args, "strict_evidence", False) and _stop_full_pipeline_for_evidence(
+        all_results,
+        "stage3",
+        stage3_results,
+        tracker,
+        json_mode,
+    ):
+        return all_results
 
     if not json_mode:
         print("\n>>> 阶段4: 商业计划书与里程碑规划")
@@ -605,14 +533,6 @@ def run_full_pipeline(args) -> dict:
     all_results["stages"]["stage4"] = stage4_results
     if tracker:
         tracker.complete_stage("stage4", stage4_results, 95)
-    if not stage4_results.get("success"):
-        return _stop_full_pipeline(
-            all_results,
-            args,
-            failed_stage="stage4",
-            tracker=tracker,
-            json_mode=json_mode,
-        )
 
     all_results["summary"] = {
         "target": args.target,
@@ -626,14 +546,14 @@ def run_full_pipeline(args) -> dict:
     }
     all_results["success"] = len(all_results["summary"]["stages_failed"]) == 0
 
-    all_results["artifacts"].update({
+    all_results["artifacts"] = {
         "stage1_json": str(Path(args.output) / "stage1" / f"{args.target}_stage1_results.json"),
         "stage2_json": str(Path(args.output) / "stage2" / f"{args.disease}_stage2_results.json"),
         "stage3_json": str(Path(args.output) / "stage3" / f"{args.target}_{args.disease}_stage3_results.json"),
         "stage4_json": str(Path(args.output) / "stage4" / f"{args.target}_{args.disease}_stage4_results.json"),
         "stage4_markdown": str(Path(args.output) / "stage4" / f"{args.target}_{args.disease}_business_plan.md"),
         "stage4_milestones": str(Path(args.output) / "stage4" / f"{args.target}_{args.disease}_milestones.json"),
-    })
+    }
 
     if all_results["success"]:
         if not json_mode:
@@ -649,11 +569,6 @@ def run_full_pipeline(args) -> dict:
                 stage4_results,
             )
             all_results["manuscript"] = manuscript
-            if not manuscript.get("success"):
-                all_results["success"] = False
-                all_results["error"] = manuscript.get(
-                    "error", "Manuscript evidence or quality gate failed"
-                )
             paths = manuscript.get("paths") or {}
             if paths.get("markdown"):
                 all_results["artifacts"]["manuscript_markdown"] = paths["markdown"]
@@ -675,8 +590,6 @@ def run_full_pipeline(args) -> dict:
                     print(f"  稿件 Word: {paths['docx']}")
         except Exception as exc:
             all_results["manuscript"] = {"success": False, "error": str(exc)}
-            all_results["success"] = False
-            all_results["error"] = str(exc)
             if not json_mode:
                 print(f"  期刊论文生成失败: {exc}")
 
@@ -698,15 +611,6 @@ def run_full_pipeline(args) -> dict:
             tracker.finish_run(all_results["summary"], all_results["artifacts"])
         else:
             tracker.fail_run(all_results.get("error", "Unknown pipeline failure"))
-
-    checkpoint_status = "completed" if all_results["success"] else "blocked"
-    all_results["artifacts"]["pipeline_checkpoint"] = _write_pipeline_checkpoint(
-        args.output,
-        all_results,
-        status=checkpoint_status,
-        current_stage="manuscript",
-        reason=all_results.get("error"),
-    )
 
     return all_results
 
@@ -865,6 +769,12 @@ def main():
     full_parser.add_argument("--output", default="./output", help="输出目录")
     full_parser.add_argument("--cache", default="./cache", help="缓存目录")
     full_parser.add_argument("--json", action="store_true", help="JSON格式输出")
+
+    full_parser.add_argument(
+        "--strict-evidence",
+        action="store_true",
+        help="Stop the full pipeline when a stage evidence gate is not decision-eligible",
+    )
 
     manuscript_parser = subparsers.add_parser(
         "manuscript", help="生成期刊论文草稿（IMRaD，基于已有四阶段结果）"

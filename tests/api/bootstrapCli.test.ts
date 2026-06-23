@@ -8,7 +8,6 @@ import { pathToFileURL } from 'node:url'
 let dirs: string[] = []
 const CLI_ENTRY = join(process.cwd(), 'src/api/cli.ts')
 const TSX_LOADER = pathToFileURL(join(process.cwd(), 'node_modules/tsx/dist/loader.mjs')).href
-const CLI_TEST_TIMEOUT_MS = 60_000
 
 afterEach(() => {
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true })
@@ -87,7 +86,7 @@ describe('bootstrap CLI', () => {
       'Re-run with --apply to install all ready dependencies in one pass.',
       'Use awesome-design-md as the source of DESIGN.md, brand direction, and visual-language selection.',
     ]))
-  }, CLI_TEST_TIMEOUT_MS)
+  }, 30_000)
 
   it('renders bootstrap output in Chinese by default and English when requested', async () => {
     const scaleDir = makeDir('scale-bootstrap-cli-scale-')
@@ -105,7 +104,7 @@ describe('bootstrap CLI', () => {
     expect(en.stdout).toContain('SCALE Dependency Bootstrap')
     expect(en.stdout).toContain('Apply: false')
     expect(en.stdout).toContain('Runtime dependencies:')
-  }, CLI_TEST_TIMEOUT_MS)
+  }, 30_000)
 
   it('provides setup as a user-facing wrapper with default Chinese language', async () => {
     const scaleDir = makeDir('scale-bootstrap-cli-scale-')
@@ -125,7 +124,7 @@ describe('bootstrap CLI', () => {
     expect(report.final.packIds).toEqual(['ui'])
     expect(report.final.runtimeChecks.map(check => check.id)).toEqual(expect.arrayContaining(['node', 'npx']))
     expect(report.final.items.map(item => item.id)).toEqual(['awesome-design-md', 'ui-ux-pro-max'])
-  }, CLI_TEST_TIMEOUT_MS)
+  }, 30_000)
 
   it('switches memory provider through setup without hand-editing config', async () => {
     const scaleDir = makeDir('scale-bootstrap-cli-scale-')
@@ -163,7 +162,7 @@ describe('bootstrap CLI', () => {
     expect(report.memoryProviderSwitch.nextOrder[0]).toBe('scale-local')
     expect(report.final.packIds).toEqual(['memory'])
     expect(report.final.runtimeChecks.map(check => check.id)).toContain('bun')
-  }, CLI_TEST_TIMEOUT_MS)
+  }, 30_000)
 
   it('verifies governed setup readiness in one report', async () => {
     const scaleDir = makeDir('scale-bootstrap-cli-scale-')
@@ -193,7 +192,7 @@ describe('bootstrap CLI', () => {
     expect(report.recommendations).toEqual(expect.arrayContaining([
       'scale tool doctor --tools awesome-design-md,ui-ux-pro-max --json',
     ]))
-  }, CLI_TEST_TIMEOUT_MS)
+  }, 30_000)
 
   it('reports workflow capability planning and bootstrap hint during init', async () => {
     const scaleDir = makeDir('scale-bootstrap-cli-scale-')
@@ -213,7 +212,7 @@ describe('bootstrap CLI', () => {
     expect(report.workflowCapabilities).toEqual(['browser', 'search', 'computer'])
     expect(report.capabilitiesEnabled).toEqual(report.workflowCapabilities)
     expect(report.dependencyBootstrapCommand).toBe('scale bootstrap deps --pack external-cli --json')
-  }, CLI_TEST_TIMEOUT_MS)
+  }, 30_000)
 
   it('derives bootstrap packs from profile and governance pack hints', async () => {
     const scaleDir = makeDir('scale-bootstrap-cli-scale-')
@@ -248,7 +247,7 @@ describe('bootstrap CLI', () => {
       'scale tool doctor --tools codegraph,graphify --json',
       'scale tool doctor --tools awesome-design-md,ui-ux-pro-max --json',
     ]))
-  }, CLI_TEST_TIMEOUT_MS)
+  }, 30_000)
 
   it('returns profile bootstrap guidance when switching config profiles', async () => {
     const scaleDir = makeDir('scale-bootstrap-cli-scale-')
@@ -278,5 +277,5 @@ describe('bootstrap CLI', () => {
     expect(report.dependencyBootstrapCommand).toBe('scale bootstrap deps --pack external-cli,memory,knowledge,ui --json')
     expect(report.dependencyBootstrapApplyCommand).toBe('scale bootstrap deps --pack external-cli,memory,knowledge,ui --apply')
     expect(report.configPath.replaceAll('\\', '/')).toBe('.scale/config.yaml')
-  }, CLI_TEST_TIMEOUT_MS)
+  }, 30_000)
 })

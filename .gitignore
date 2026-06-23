@@ -26,6 +26,7 @@ graphify-out/
 .scale/cache/
 cache/
 .scale/memory-provider-imports/
+.scale/model-usage/
 .scale/worktrees/
 !.scale/artifacts/
 !.scale/rules/enforced/
@@ -52,6 +53,7 @@ scale-engine-compare
 .codex/worktrees/
 .codex/tmp/
 .codex-tmp/
+.context/compound-engineering/todos/
 .cursor/tmp/
 .codegraph/
 .continue/
@@ -86,7 +88,6 @@ test_output/
 # Target research platform — track only files needed by npm pack
 target-research-platform/*
 !target-research-platform/main.py
-!target-research-platform/README.md
 !target-research-platform/bridge_runner.py
 !target-research-platform/run_dashboard.py
 !target-research-platform/run_real_medical_workflow.py
@@ -98,27 +99,8 @@ target-research-platform/*
 !target-research-platform/docs/
 !target-research-platform/data/
 !target-research-platform/tests/
-target-research-platform/tests/*
-!target-research-platform/tests/test_validators.py
-!target-research-platform/tests/test_pipeline_integration.py
-!target-research-platform/tests/test_full_pipeline_gates.py
-!target-research-platform/tests/test_manuscript_generator.py
-!target-research-platform/tests/test_manuscript_fact_check.py
-!target-research-platform/tests/test_manuscript_enhanced.py
-!target-research-platform/tests/test_research_governance.py
-!target-research-platform/tests/test_adapter_sdk.py
-!target-research-platform/tests/test_geo_reference_integration.py
-!target-research-platform/tests/test_geo_normalization_assessment.py
-!target-research-platform/tests/test_project_admission.py
-!target-research-platform/tests/test_terminology_literature.py
-!target-research-platform/tests/test_mesh_pubmed_integration.py
-!target-research-platform/tests/test_mapping_evidence_workflow.py
-!target-research-platform/config/
-target-research-platform/config/*
-!target-research-platform/config/reference_controls/
-!target-research-platform/config/reference_controls/*.json
-!target-research-platform/config/templates/
-!target-research-platform/config/templates/*.json
+target-research-platform/tests/__pycache__/
+!target-research-platform/tests/*.py
 
 # IDE & tool configs
 .claude-plugin/

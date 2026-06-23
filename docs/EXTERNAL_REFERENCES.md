@@ -13,7 +13,7 @@ The inventory is intentionally conservative:
 
 | Upstream | Role in SCALE | Usage status | License status | Primary source surface |
 | --- | --- | --- | --- | --- |
-| [hongmaple0820/med-scale-research-os](https://github.com/hongmaple0820/med-scale-research-os) | Published MedSCALE Research OS package repository | package metadata reference | project-owned | `package.json` repository, bugs, and homepage metadata |
+| [hongmaple0820/med-scale-research-os](https://github.com/hongmaple0820/med-scale-research-os) | MedSCALE source repository referenced by package README metadata | first-party repository reference | internal | README, package metadata |
 | [OthmanAdi/planning-with-files](https://github.com/OthmanAdi/planning-with-files) | File-backed planning workflow reference | adapted concept, not vendored | MIT | `SkillRepository`, README, `THIRD_PARTY_SKILLS` |
 | [rohitg00/agentmemory](https://github.com/rohitg00/agentmemory) | Secondary external memory provider | external provider, fallback-only | Apache-2.0 | `MemoryProviders`, `SkillRepository`, README |
 | [garrytan/gbrain](https://github.com/garrytan/gbrain) | Default graph-backed memory provider | external provider, default-enabled | MIT | `MemoryProviders`, `SkillRepository`, README |

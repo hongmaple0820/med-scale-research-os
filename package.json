@@ -1,6 +1,6 @@
 {
   "name": "@hongmaple0820/med-scale-research-os",
-  "version": "0.44.2",
+  "version": "0.44.4",
   "description": "MedSCALE Research OS: evidence-driven medical research workflow with literature review, fact checks, package audit, memory review, and a researcher dashboard",
   "repository": {
     "type": "git",
@@ -36,6 +36,7 @@
     "target-research-platform/scripts",
     "target-research-platform/docs",
     "target-research-platform/data",
+    "target-research-platform/tests",
     ".scale/skills.json",
     ".scale/mcp-servers.yaml",
     ".scale/verification.json",
@@ -72,8 +73,9 @@
     "smoke:providers": "node scripts/workflow/provider-rehearsal.mjs",
     "smoke:gbrain": "node scripts/workflow/provider-rehearsal.mjs --skip-graphify --require-gbrain",
     "smoke:graphify": "node scripts/workflow/provider-rehearsal.mjs --skip-gbrain --require-graphify",
-    "release:check": "npm run typecheck && npm run lint && npm run build && npm test && npm run smoke:setup && npm run smoke:providers -- --write-report && npm run smoke:medscale-release && npm audit --omit=dev --registry=https://registry.npmjs.org && git diff --check && npm pack --dry-run",
-    "release:medscale": "npm run typecheck && npm test -- tests/cli/targetCommands.test.ts tests/cli/medscaleCli.test.ts tests/memory/MemoryReview.test.ts && npm run smoke:medscale-release",
+    "release:medscale:readiness": "npm run medscale -- target release-check --json",
+    "release:check": "npm run release:medscale:readiness && npm run typecheck && npm run lint && npm run build && npm test && npm run smoke:setup && npm run smoke:providers -- --write-report && npm run smoke:medscale-release && npm audit --omit=dev --registry=https://registry.npmjs.org && git diff --check && npm pack --dry-run",
+    "release:medscale": "npm run release:medscale:readiness && npm run typecheck && npm test -- tests/cli/targetCommands.test.ts tests/cli/medscaleCli.test.ts tests/memory/MemoryReview.test.ts && npm run smoke:medscale-release",
     "mcp": "node dist/api/mcp.js",
     "serve": "node dist/api/http.js"
   },

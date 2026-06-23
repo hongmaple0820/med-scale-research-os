@@ -1,12 +1,14 @@
 """
-Human Protein Atlas (HPA) API client.
+Human Protein Atlas (HPA) API客户端
+用于获取蛋白表达、亚细胞定位等数据
+API文档：https://www.proteinatlas.org/about/help/api
 """
-
+from typing import Optional
 from .base_client import BaseAPIClient, APIResponse
 
 
 class HPAClient(BaseAPIClient):
-    """Human Protein Atlas API client."""
+    """Human Protein Atlas API客户端"""
 
     @property
     def source_name(self) -> str:
@@ -17,50 +19,79 @@ class HPAClient(BaseAPIClient):
         return "https://www.proteinatlas.org"
 
     def health_check(self) -> bool:
+        """检查HPA API可用性"""
         response = self._make_request(
             "GET",
             "/ENSG00000146648.json",
-            use_cache=False,
+            use_cache=False
         )
         return response.success
 
     def get_protein_expression(self, ensg_id: str) -> APIResponse:
+        """
+        获取蛋白表达数据（IHC）
+
+        Args:
+            ensg_id: Ensembl基因ID，如 "ENSG00000146648"
+
+        Returns:
+            包含蛋白表达数据的APIResponse
+        """
         response = self._make_request("GET", f"/{ensg_id}.json")
+
         if not response.success:
             return response
+
         return self._parse_protein_data(response, ensg_id)
 
     def _parse_protein_data(self, response: APIResponse, ensg_id: str) -> APIResponse:
+        """解析HPA蛋白数据"""
         try:
             raw_data = response.data
             if not raw_data:
                 return response
 
-            protein_data = raw_data[0] if isinstance(raw_data, list) else raw_data
+            # HPA返回的是数组，取第一个
+            if isinstance(raw_data, list):
+                protein_data = raw_data[0] if raw_data else {}
+            else:
+                protein_data = raw_data
+
+            # 提取组织表达数据
+            tissue_expression = []
+            for tissue in protein_data.get('tissueExpression', []):
+                tissue_expression.append({
+                    "tissue": tissue.get('tissue', ''),
+                    "level": tissue.get('level', ''),  # High/Medium/Low/Not detected
+                    "cell_type": tissue.get('cellType', ''),
+                    "reliability": tissue.get('reliability', '')
+                })
+
+            # 提取亚细胞定位
+            subcellular = []
+            for loc in protein_data.get('subcellularLocation', []):
+                subcellular.append({
+                    "location": loc.get('location', ''),
+                    "reliability": loc.get('reliability', '')
+                })
 
             return APIResponse(
                 success=True,
                 data={
                     "ensg_id": ensg_id,
-                    "gene_name": protein_data.get("Gene", ""),
-                    "protein_name": protein_data.get("Gene description", ""),
-                    "tissue_expression": self._extract_tissue_expression(protein_data),
-                    "cell_type_expression": self._extract_cell_type_expression(protein_data),
-                    "subcellular_location": self._extract_subcellular_locations(protein_data),
-                    "antibody": protein_data.get("Antibody", []),
-                    "protein_tissue_specificity": protein_data.get("Protein tissue specificity", ""),
-                    "protein_tissue_distribution": protein_data.get("Protein tissue distribution", ""),
-                    "protein_cell_type_specificity": protein_data.get("Protein cell type specificity", ""),
-                    "protein_cell_type_distribution": protein_data.get("Protein cell type distribution", ""),
-                    "ih_reliability": protein_data.get("Reliability (IH)", ""),
-                    "if_reliability": protein_data.get("Reliability (IF)", ""),
+                    "gene_name": protein_data.get('Gene', ''),
+                    "protein_name": protein_data.get('Gene description', ''),
+                    "tissue_expression": tissue_expression,
+                    "subcellular_location": subcellular,
+                    "antibody": protein_data.get('Antibody', '')
                 },
                 source=self.source_name,
                 endpoint=f"/{ensg_id}.json",
                 params={"ensg_id": ensg_id},
-                timestamp=response.timestamp,
+                timestamp=response.timestamp
             )
-        except (KeyError, TypeError, ValueError) as exc:
+
+        except (KeyError, ValueError, TypeError) as e:
             return APIResponse(
                 success=False,
                 data=None,
@@ -68,92 +99,19 @@ class HPAClient(BaseAPIClient):
                 endpoint=f"/{ensg_id}.json",
                 params={"ensg_id": ensg_id},
                 timestamp=response.timestamp,
-                error=f"Data parse error: {exc}",
+                error=f"数据解析错误: {str(e)}"
             )
 
-    def _extract_tissue_expression(self, protein_data: dict) -> list[dict]:
-        entries: list[dict] = []
-        intensities = protein_data.get("Protein tissue specific Intensity")
-        reliability = protein_data.get("Reliability (IH)", "")
-        distribution = protein_data.get("Protein tissue distribution", "")
-        specificity = protein_data.get("Protein tissue specificity", "")
-
-        if isinstance(intensities, dict):
-            for tissue, intensity in intensities.items():
-                entries.append({
-                    "tissue": str(tissue),
-                    "intensity": self._coerce_float(intensity),
-                    "level": distribution,
-                    "specificity": specificity,
-                    "reliability": reliability,
-                })
-
-        if not entries and (distribution or specificity):
-            entries.append({
-                "tissue": "summary",
-                "intensity": None,
-                "level": distribution,
-                "specificity": specificity,
-                "reliability": reliability,
-            })
-
-        return entries
-
-    def _extract_cell_type_expression(self, protein_data: dict) -> list[dict]:
-        entries: list[dict] = []
-        intensities = protein_data.get("Protein cell type specific Intensity")
-        reliability = protein_data.get("Reliability (IH)", "")
-        distribution = protein_data.get("Protein cell type distribution", "")
-        specificity = protein_data.get("Protein cell type specificity", "")
-
-        if isinstance(intensities, dict):
-            for cell_type, intensity in intensities.items():
-                entries.append({
-                    "cell_type": str(cell_type),
-                    "intensity": self._coerce_float(intensity),
-                    "level": distribution,
-                    "specificity": specificity,
-                    "reliability": reliability,
-                })
-
-        return entries
-
-    def _extract_subcellular_locations(self, protein_data: dict) -> list[dict]:
-        seen: set[str] = set()
-        locations: list[dict] = []
-        reliability = protein_data.get("Reliability (IF)", "")
-        raw_values = (
-            protein_data.get("Subcellular location"),
-            protein_data.get("Subcellular main location"),
-            protein_data.get("Subcellular additional location"),
-        )
-
-        for raw in raw_values:
-            for value in self._iter_values(raw):
-                location = str(value).strip()
-                if location and location not in seen:
-                    seen.add(location)
-                    locations.append({
-                        "location": location,
-                        "reliability": reliability,
-                    })
-
-        return locations
-
-    def _iter_values(self, raw) -> list[str]:
-        if isinstance(raw, list):
-            return [str(item) for item in raw if str(item).strip()]
-        if isinstance(raw, str) and raw.strip():
-            return [raw]
-        return []
-
-    def _coerce_float(self, value):
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-
     def get_subcellular_location(self, ensg_id: str) -> APIResponse:
+        """
+        获取亚细胞定位信息
+
+        Args:
+            ensg_id: Ensembl基因ID
+
+        Returns:
+            包含亚细胞定位的APIResponse
+        """
         response = self.get_protein_expression(ensg_id)
         if not response.success:
             return response
@@ -162,37 +120,45 @@ class HPAClient(BaseAPIClient):
             success=True,
             data={
                 "ensg_id": ensg_id,
-                "subcellular_location": response.data.get("subcellular_location", []),
+                "subcellular_location": response.data.get("subcellular_location", [])
             },
             source=self.source_name,
             endpoint=f"/{ensg_id}.json",
             params={"ensg_id": ensg_id},
-            timestamp=response.timestamp,
+            timestamp=response.timestamp
         )
 
     def validate_protein_data(self, data: dict) -> tuple[bool, list[str]]:
+        """验证蛋白数据合理性"""
         issues = []
 
         if not data:
-            return False, ["Missing protein data"]
+            return False, ["缺少数据"]
 
-        has_tissue_signal = bool(
-            data.get("tissue_expression")
-            or data.get("protein_tissue_distribution")
-            or data.get("protein_tissue_specificity")
-            or data.get("cell_type_expression")
-            or data.get("protein_cell_type_distribution")
-            or data.get("protein_cell_type_specificity")
-        )
-        if not has_tissue_signal:
-            issues.append("Missing protein expression signal")
+        # 检查组织表达数据
+        tissue_expr = data.get("tissue_expression", [])
+        if len(tissue_expr) < 10:
+            issues.append(f"组织表达数据不足: {len(tissue_expr)} < 10")
 
-        if not data.get("subcellular_location"):
-            issues.append("Missing subcellular localization data")
+        # 检查亚细胞定位
+        subcellular = data.get("subcellular_location", [])
+        if not subcellular:
+            issues.append("缺少亚细胞定位数据")
 
         return len(issues) == 0, issues
 
     def search_gene_by_symbol(self, gene_symbol: str) -> APIResponse:
+        """
+        通过基因符号搜索Ensembl ID
+
+        Args:
+            gene_symbol: 基因符号
+
+        Returns:
+            包含Ensembl ID的APIResponse
+        """
+        # HPA不提供直接的符号搜索，需要通过其他方式
+        # 这里返回一个需要外部转换的提示
         return APIResponse(
             success=False,
             data=None,
@@ -200,5 +166,5 @@ class HPAClient(BaseAPIClient):
             endpoint="/search",
             params={"gene_symbol": gene_symbol},
             timestamp="",
-            error="HPA API requires an Ensembl identifier.",
+            error="HPA API不支持直接按基因符号搜索，请使用Ensembl ID"
         )

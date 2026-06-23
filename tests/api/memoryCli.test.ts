@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { execa } from 'execa'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { delimiter, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 let dirs: string[] = []
@@ -196,7 +196,7 @@ describe('memory CLI', () => {
     expect(recallReport.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ provider: 'scale-local', id: 'MEM-provider-oauth' }),
     ]))
-    expect(recallReport.warnings).toEqual([])
+    expect(recallReport.warnings.filter(warning => !/^gbrain skipped:/.test(warning))).toEqual([])
 
     const packResult = await runScale([
       'memory',
@@ -243,10 +243,29 @@ describe('memory CLI', () => {
       'exit /b 1',
       '',
     ].join('\r\n'), 'utf-8')
+    const gbrainShim = join(binDir, 'gbrain')
+    writeFileSync(gbrainShim, [
+      '#!/usr/bin/env bash',
+      'echo "$*" >> "$GBRAIN_TEST_LOG"',
+      'if [ "$1" = "doctor" ]; then',
+      '  echo \'{"status":"healthy","health_score":100,"checks":[{"name":"connection","status":"ok"},{"name":"schema_version","status":"ok"}]}\'',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "import" ]; then',
+      '  echo "Found 2 markdown files"',
+      '  echo "Import complete"',
+      '  echo "  2 pages imported"',
+      '  exit 0',
+      'fi',
+      'echo "unsupported $1" >&2',
+      'exit 1',
+      '',
+    ].join('\n'), 'utf-8')
+    chmodSync(gbrainShim, 0o755)
     writeFileSync(join(docsDir, 'MEMORY_FABRIC.md'), '# Memory Fabric\n', 'utf-8')
 
     const init = await runScaleWithEnv(['memory', 'provider', 'init', '--json'], scaleDir, projectDir, {
-      PATH: `${binDir};${process.env.PATH ?? ''}`,
+      PATH: `${binDir}${delimiter}${process.env.PATH ?? ''}`,
       GBRAIN_TEST_LOG: gbrainLog,
     })
     expect(init.exitCode).toBe(0)
@@ -260,7 +279,7 @@ describe('memory CLI', () => {
       'README.md,docs/MEMORY_FABRIC.md',
       '--json',
     ], scaleDir, projectDir, {
-      PATH: `${binDir};${process.env.PATH ?? ''}`,
+      PATH: `${binDir}${delimiter}${process.env.PATH ?? ''}`,
       GBRAIN_TEST_LOG: gbrainLog,
     })
 

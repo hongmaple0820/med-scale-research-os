@@ -91,6 +91,15 @@ jobs:
             echo "${PACKAGE}@${VERSION} is not published yet."
           fi
 
+      - name: Record release no-model usage attestation
+        run: |
+          npm run medscale -- target token attest-no-usage \
+            --scope "github-release-${{ steps.meta.outputs.tag }}" \
+            --reason "GitHub release verification runs deterministic build, test, audit, and publish dry-run checks only; no model provider call is executed in this workflow." \
+            --asserted-by "github-actions" \
+            --evidence "npm run release:medscale,npm publish --dry-run,npm pack --dry-run" \
+            --json
+
       - name: Verify MedSCALE release gate
         run: npm run release:medscale
 

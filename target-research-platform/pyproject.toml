@@ -51,7 +51,4 @@ include = ["src*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --tb=short -m \"not integration\""
-markers = [
-    "integration: live external API connectivity tests; run explicitly with -m integration",
-]
+addopts = "-v --tb=short"

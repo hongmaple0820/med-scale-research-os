@@ -3,7 +3,12 @@
 """
 from .data_provenance import ProvenanceTracker, DataProvenanceValidator, UnverifiedDataError
 from .cross_validator import CrossValidator, ValidationResult
-from .evidence_gate import evaluate_stage1_evidence, compare_de_sources
+from .evidence_gate import (
+    compare_de_sources,
+    evaluate_stage1_evidence,
+    evaluate_stage2_evidence,
+    evaluate_stage3_evidence,
+)
 
 __all__ = [
     "ProvenanceTracker",
@@ -11,6 +16,8 @@ __all__ = [
     "UnverifiedDataError",
     "CrossValidator",
     "ValidationResult",
+    "compare_de_sources",
     "evaluate_stage1_evidence",
-    "compare_de_sources"
+    "evaluate_stage2_evidence",
+    "evaluate_stage3_evidence",
 ]

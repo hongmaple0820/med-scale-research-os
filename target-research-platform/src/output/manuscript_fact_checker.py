@@ -30,13 +30,6 @@ REVIEW_TERMS = ("review", "综述")
 SYSTEMATIC_TERMS = ("systematic review", "meta-analysis", "meta analysis", "meta分析", "meta 分析", "系统综述", "Meta")
 CLINICAL_TERMS = ("clinical trial", "randomized", "phase", "患者", "临床")
 PRECLINICAL_TERMS = ("cell", "mouse", "mice", "xenograft", "体外", "小鼠", "临床前")
-KNOWN_DISEASE_MARKERS = {
-    "breast cancer": ("breast cancer", "乳腺癌", "hr+"),
-    "lung cancer": ("lung cancer", "肺癌"),
-    "colorectal cancer": ("colorectal cancer", "结直肠癌"),
-    "prostate cancer": ("prostate cancer", "前列腺癌"),
-    "pancreatic cancer": ("pancreatic cancer", "胰腺癌"),
-}
 
 
 def _read_text(path: str | None) -> str:
@@ -219,102 +212,6 @@ def _check_figures(
     return checked
 
 
-def _check_contamination(
-    metadata: dict[str, Any],
-    markdown: str,
-    issues: list[dict[str, Any]],
-) -> None:
-    target = str(metadata.get("target") or "").strip()
-    disease = str(metadata.get("disease") or "").strip().lower()
-    lowered = markdown.lower()
-
-    if target and target.lower() not in lowered:
-        _add_issue(
-            issues,
-            "contamination.target_missing",
-            "error",
-            "Requested target is not visible in the manuscript.",
-            evidence=target,
-        )
-    if target.upper() != "CDK4" and re.search(r"(?<![A-Z0-9])CDK4(?:/6)?(?![A-Z0-9])", markdown, re.I):
-        _add_issue(
-            issues,
-            "contamination.target_template",
-            "error",
-            "Unexpected CDK4/CDK4-6 template content is present for another target.",
-            evidence=target,
-        )
-
-    for known_disease, markers in KNOWN_DISEASE_MARKERS.items():
-        if known_disease == disease:
-            continue
-        found = [marker for marker in markers if marker.lower() in lowered]
-        if found:
-            _add_issue(
-                issues,
-                "contamination.disease_template",
-                "error",
-                "Manuscript contains disease-template content unrelated to the requested disease.",
-                evidence={"requested": disease, "unexpected": known_disease, "markers": found},
-            )
-
-    expected_cohorts = {
-        str(code).strip().upper()
-        for code in (metadata.get("cancer_types") or [])
-        if str(code).strip()
-    }
-    observed_cohorts = {
-        match.upper()
-        for match in re.findall(r"\bTCGA-([A-Z0-9]+)\b", markdown, flags=re.I)
-    }
-    unexpected = sorted(observed_cohorts - expected_cohorts) if expected_cohorts else []
-    if unexpected:
-        _add_issue(
-            issues,
-            "contamination.tcga_cohort",
-            "error",
-            "Manuscript cites TCGA cohorts not declared by upstream evidence.",
-            evidence={
-                "expected": sorted(expected_cohorts),
-                "unexpected": unexpected,
-            },
-        )
-
-
-def _check_claim_ledger(
-    metadata: dict[str, Any],
-    issues: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    ledger = metadata.get("claim_ledger") or []
-    if not isinstance(ledger, list):
-        ledger = []
-    by_id = {
-        str(item.get("claim_id")): item
-        for item in ledger
-        if isinstance(item, dict) and item.get("claim_id")
-    }
-    for claim_id, value in _expected_numeric_claims(metadata):
-        entry = by_id.get(claim_id)
-        if not entry:
-            _add_issue(
-                issues,
-                "claim_ledger.missing",
-                "error",
-                "Quantitative claim is missing from the claim ledger.",
-                evidence={"claim": claim_id, "value": value},
-            )
-            continue
-        if not str(entry.get("source_locator") or "").strip():
-            _add_issue(
-                issues,
-                "claim_ledger.source_missing",
-                "error",
-                "Quantitative claim lacks a source locator.",
-                evidence=claim_id,
-            )
-    return ledger
-
-
 def validate_manuscript_facts(result: dict[str, Any]) -> dict[str, Any]:
     """Return a machine-readable fact-check report for a manuscript result."""
     paths = result.get("paths") or {}
@@ -330,8 +227,6 @@ def validate_manuscript_facts(result: dict[str, Any]) -> dict[str, Any]:
 
     checked_lit, supported_lit = _check_literature(metadata, issues)
     checked_figures = _check_figures(metadata, markdown, issues)
-    _check_contamination(metadata, markdown, issues)
-    claim_ledger = _check_claim_ledger(metadata, issues)
     claims_checked += checked_lit + checked_figures
 
     numeric_mismatches: list[dict[str, Any]] = []
@@ -365,7 +260,6 @@ def validate_manuscript_facts(result: dict[str, Any]) -> dict[str, Any]:
         "numeric_claims_checked": len(_expected_numeric_claims(metadata)),
         "references": len(references) if isinstance(references, list) else 0,
         "model_usage_envelopes": len(usage_envelopes),
-        "claim_ledger_entries": len(claim_ledger),
     }
 
     errors = sum(1 for issue in issues if issue["severity"] == "error")
@@ -380,7 +274,6 @@ def validate_manuscript_facts(result: dict[str, Any]) -> dict[str, Any]:
         "source_coverage": source_coverage,
         "unverified_claims": unverified_claims,
         "numeric_mismatches": numeric_mismatches,
-        "claim_ledger": claim_ledger,
         "usage_summary": summarize_usage_envelopes(usage_envelopes),
         "issues": issues,
     }

@@ -12,6 +12,8 @@ from .opentargets_client import OpenTargetsClient
 from .geo_client import GEOClient
 from .clinicaltrials_client import ClinicalTrialsClient
 from .immune_data_manager import ImmuneDataManager
+from .openfda_client import OpenFDAClient
+from .patentsview_client import PatentsViewClient
 
 __all__ = [
     "BaseAPIClient",
@@ -25,5 +27,7 @@ __all__ = [
     "OpenTargetsClient",
     "GEOClient",
     "ClinicalTrialsClient",
-    "ImmuneDataManager"
+    "ImmuneDataManager",
+    "OpenFDAClient",
+    "PatentsViewClient",
 ]

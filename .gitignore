@@ -98,6 +98,9 @@ target-research-platform/*
 !target-research-platform/scripts/
 !target-research-platform/docs/
 !target-research-platform/data/
+!target-research-platform/tests/
+target-research-platform/tests/__pycache__/
+!target-research-platform/tests/*.py
 
 # IDE & tool configs
 .claude-plugin/

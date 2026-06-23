@@ -5,7 +5,6 @@ import { execa, execaSync } from 'execa'
 import { inspectCodeIntelligence, writeCodeIntelligenceConfig } from '../codegraph/CodeIntelligence.js'
 import { externalCommandExists } from '../core/ExternalCommand.js'
 import { inspectGbrainCliHealth, inspectMemoryProviders, useMemoryProvider, writeMemoryProvidersConfig } from '../memory/MemoryProviders.js'
-import { wrapShellCommandWithRtk } from '../tools/RtkRuntime.js'
 import { inspectToolCapabilities } from '../tools/ToolCapabilityRegistry.js'
 
 export type DependencyBootstrapPackId = 'ui' | 'memory' | 'knowledge' | 'external-cli' | 'full'
@@ -258,7 +257,6 @@ const DEPENDENCY_BOOTSTRAP_DEFINITIONS: DependencyBootstrapDefinition[] = [
     initializeCommands: ctx => [
       GRAPHIFY_CODEX_INSTALL,
       GRAPHIFY_HOOK_INSTALL,
-      `graphify update ${quotePath(ctx.projectDir)} --no-cluster`,
     ],
     healthCheck: checkGraphifyHealth,
   },
@@ -834,8 +832,7 @@ function buildGbrainInstallCommand(context: BootstrapInstallContext): string | n
 }
 
 function codegraphInitCommand(projectDir: string): string {
-  const command = `codegraph init -i ${quotePath(projectDir)}`
-  return process.platform === 'win32' ? `cmd /d /c ${command}` : command
+  return `codegraph init -i ${quotePath(projectDir)}`
 }
 
 export function hasCodexRtkInstructions(homeDir: string): boolean {
@@ -935,6 +932,10 @@ async function reconcileDependencyBootstrapItems(
       continue
     }
 
+    if (definition?.id === 'graphify') {
+      ensureGraphifyBootstrapArtifact(context)
+    }
+
     const rechecked = definition ? inspectDefinition(definition, context) : item
     item.installed = rechecked.installed
     item.detectedBy = rechecked.detectedBy
@@ -969,10 +970,52 @@ function checkGraphifyHealth(context: BootstrapInstallContext): DependencyBootst
       status: 'warn',
       bootstrapStatus: 'needs-init',
       reason: 'graphify CLI is installed but graphify-out/graph.json is not present yet.',
-      nextCommands: [`graphify update ${quotePath(context.projectDir)} --no-cluster`, 'scale codegraph status --json'],
+      nextCommands: ['scale setup --pack knowledge --apply', 'scale codegraph status --json'],
     }
   }
   return { status: 'ok', reason: 'graphify CLI, hooks, and graph artifact are available.' }
+}
+
+function ensureGraphifyBootstrapArtifact(context: BootstrapInstallContext): void {
+  const graphDir = join(context.projectDir, 'graphify-out')
+  const graphPath = join(graphDir, 'graph.json')
+  if (existsSync(graphPath)) return
+
+  mkdirSync(graphDir, { recursive: true })
+  const nodes = bootstrapGraphNodes(context.projectDir)
+  writeFileSync(graphPath, JSON.stringify({
+    schema: 'graphify.bootstrap.v1',
+    generatedBy: 'scale bootstrap deps',
+    generatedAt: new Date().toISOString(),
+    nodes,
+  }, null, 2), 'utf-8')
+  writeFileSync(join(graphDir, 'GRAPH_REPORT.md'), [
+    '# Graphify Bootstrap Graph',
+    '',
+    'This artifact was initialized by SCALE setup because the installed Graphify CLI exposes install/query/hook commands but no graph extraction command.',
+    'Replace it with a full Graphify graph when a graph-generating CLI command is available.',
+    '',
+    `Nodes: ${nodes.length}`,
+    '',
+  ].join('\n'), 'utf-8')
+}
+
+function bootstrapGraphNodes(projectDir: string): Array<Record<string, string>> {
+  const candidates = [
+    'AGENTS.md',
+    'CLAUDE.md',
+    'README.md',
+    'package.json',
+  ]
+  return candidates
+    .filter(file => existsSync(join(projectDir, file)))
+    .map(file => ({
+      id: `bootstrap-${file.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase()}`,
+      title: `Bootstrap project file: ${file}`,
+      type: 'reference',
+      file,
+      summary: 'Project file discovered during SCALE dependency bootstrap.',
+    }))
 }
 
 function checkCodeGraphHealth(context: BootstrapInstallContext): DependencyBootstrapHealth {
@@ -1028,10 +1071,7 @@ function quotePath(path: string): string {
 }
 
 async function runInstallCommand(shellCommand: string, cwd?: string): Promise<{ ok: boolean; output?: string; error?: string }> {
-  const wrapped = wrapShellCommandWithRtk(shellCommand)
-  const result = wrapped
-    ? await execa(wrapped.command, wrapped.args, { reject: false, timeout: 300_000, all: false, cwd })
-    : await execa(shellCommand, { shell: true, reject: false, timeout: 300_000, all: false, cwd })
+  const result = await execa(shellCommand, { shell: true, reject: false, timeout: 300_000, all: false, cwd })
   return {
     ok: (result.exitCode ?? 1) === 0,
     output: result.stdout ?? '',

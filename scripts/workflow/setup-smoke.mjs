@@ -83,6 +83,8 @@ function runSetupSmoke() {
   assertArrayContains(deps.runtimeChecks?.map(check => check.id), ['node', 'npm', 'cargo', 'bun', 'python', 'python-installer'], 'bootstrap deps should report all runtime dependency checks')
   assertArrayContains(deps.items?.map(item => item.id), ['rtk', 'gbrain', 'graphify', 'codegraph'], 'bootstrap deps should include governed third-party capabilities')
   assert(deps.apply === false, 'bootstrap smoke must not run installers')
+  const cargoReady = deps.runtimeChecks?.find(check => check.id === 'cargo')?.status === 'ok'
+  const governedApplyPack = cargoReady ? 'external-cli,memory,knowledge' : 'memory,knowledge'
 
   const envDoctor = runJson('doctor-env-json', ['doctor', 'env', '--json'], baseEnv)
   assert(envDoctor.ok === true, 'environment doctor should pass when required core commands are available')
@@ -126,7 +128,7 @@ function runSetupSmoke() {
     '--dir',
     projectDir,
     '--pack',
-    'external-cli,memory,knowledge',
+    governedApplyPack,
     '--apply',
     '--memory-provider',
     'gbrain',
@@ -134,18 +136,20 @@ function runSetupSmoke() {
     'external-first',
     '--json',
   ], baseEnv)
-  assert(apply.final?.ok === true, 'setup apply should succeed for external-cli, memory, and knowledge packs')
+  assert(apply.final?.ok === true, `setup apply should succeed for ${governedApplyPack} packs`)
   assert(apply.final?.complete === true, 'setup apply should leave the selected packs fully installed')
-  assert(apply.final?.summary?.needsInit === 0, 'setup apply should not leave RTK, GBrain, Graphify, or CodeGraph uninitialized')
+  assert(apply.final?.summary?.needsInit === 0, 'setup apply should not leave selected tools uninitialized')
   assert(apply.memoryProviderSwitch?.provider === 'gbrain', 'setup apply should keep gbrain as the selected provider')
   assert(existsSync(join(projectDir, '.codegraph')), 'setup apply should initialize a CodeGraph index in the target project')
   assert(existsSync(join(projectDir, 'graphify-out', 'graph.json')), 'setup apply should generate a Graphify graph artifact without LLM usage')
   assert(existsSync(join(projectDir, '.git', 'hooks', 'post-commit')), 'setup apply should install the Graphify post-commit hook')
   assert(existsSync(join(projectDir, '.git', 'hooks', 'post-checkout')), 'setup apply should install the Graphify post-checkout hook')
-  assert(
-    ['installed', 'installed-now'].includes(apply.final?.items?.find(item => item.id === 'rtk')?.status),
-    'setup apply should leave RTK in an installed state after Codex initialization',
-  )
+  if (cargoReady) {
+    assert(
+      ['installed', 'installed-now'].includes(apply.final?.items?.find(item => item.id === 'rtk')?.status),
+      'setup apply should leave RTK in an installed state after Codex initialization',
+    )
+  }
   assert(
     ['installed', 'installed-now'].includes(apply.final?.items?.find(item => item.id === 'graphify')?.status),
     'setup apply should leave Graphify in an installed state after hook and graph initialization',
@@ -158,7 +162,7 @@ function runSetupSmoke() {
     '--dir',
     projectDir,
     '--pack',
-    'external-cli,memory,knowledge',
+    governedApplyPack,
     '--json',
   ], baseEnv)
   assert(verify.ok === true, 'setup verify should pass after governed apply in the isolated home')

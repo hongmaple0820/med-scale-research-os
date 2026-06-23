@@ -132,7 +132,7 @@ export const TOOL_CAPABILITY_CATALOG: ToolCatalogEntry[] = [
     name: 'Graphify',
     category: 'cli',
     command: 'graphify',
-    versionArgs: ['--version'],
+    versionArgs: ['--help'],
     requiredFor: [],
     recommendedFor: ['review'],
     source: 'https://github.com/safishamsi/graphify',
